@@ -45,31 +45,10 @@ class SeperateCompany:
         return factor_top_n
 
     """
-    INPUT: self, 存放單一因子指標的Datafram, 切割成N等分
-    OUTPUT: N個DF 每個代表當天每N分位的公司(Quantile 1 的因子值最大)
-    FUNCTION: 把所有公司切成N等分
+    INPUT: self, 已經被切成N等分的Datafram
+    OUTPUT: 存放各個quantile的回測結果的dict
+    FUNCTION: 計算各個quantile的回測結果
     """
-
-    # def backtest_all_quantile(self, quantile_dict):
-    #     # 計算每個分位數的報酬率
-    #     quantile_returns = pd.DataFrame()
-    #     for quantile_name, quantile_df in quantile_dict.items():
-    #         print(quantile_name)
-    #         # 創建一個Backtest對象
-    #         backtest = Backtest(quantile_df)
-    #         # 計算每個分位數的報酬率
-    #         print(quantile_name, "position\n", backtest.position)
-    #         # 持有股票張數
-    #         print(quantile_name, "shares_df\n", backtest.shares_df)
-    #         # 資產配置(包含: 資產價值、手續費、每次拿來交易的金額、剩餘金額)
-    #         print(quantile_name, "assets\n", backtest.assets)
-    #         # 這個最重要
-    #         # 總表，可以看這個就好
-    #         print(quantile_name, "stock_data\n", backtest.stock_data)
-
-    #     # 輸出每個分位數的報酬率
-    #     # print(quantile_returns)
-    #     return
 
     def backtest_all_quantile(self, quantile_dict):
         # 创建一个字典，用于存储不同分位数的数据
@@ -89,6 +68,12 @@ class SeperateCompany:
 
         # 返回包含不同分位数数据的字典
         return result_dict
+
+    """
+    INPUT: self, 存放單一因子指標的Datafram, 切割成N等分
+    OUTPUT: N個DF 每個代表當天每N分位的公司(Quantile 1 的因子值最大)
+    FUNCTION: 把所有公司切成N等分
+    """
 
     def get_quantile_factor(self, factor_df, N=4):
         # 動態指定分位數的數量
