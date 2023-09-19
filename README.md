@@ -1,14 +1,10 @@
-## 專案命名規則
-- 參考: https://ithelp.ithome.com.tw/articles/10260109
-- 類別Class: 使用每個單字的字首用單寫 (如：CapWords)。
-- 模組 module: 用小寫及底線 (如：lower_with_under.py)。
-- 函數 function: 一律小寫,文字串接的時候使用下底線 (如：def add(): )。
-- 全域變數 Globals、 常數 Constants: 一律大寫	(如 PI=3.14)。
-- 區域變數 Local variable: 一律小寫,文字串接的時候使用下底線 (val_name = 123)。
-
+## 使用Anaconda
+- 建立一個自己的環境
+- 並匯入requirements.txt 的套件
 
 ## 目前技術上的問題
 - Talib 不支支援到最新的python3.11，目前改用python3.8
+- 但目前沒用到Talib
 - Python 的switch架構僅適用於3.10以上
 - 兩個項目有點衝突
 
