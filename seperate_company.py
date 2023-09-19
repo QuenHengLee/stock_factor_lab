@@ -1,6 +1,6 @@
 from get_data import Data
 from database import Database
-from Backtest import Backtest
+from backtest import Backtest
 import pandas as pd
 
 
@@ -65,6 +65,8 @@ class SeperateCompany:
                 "assets": backtest.assets,
                 "stock_data": backtest.stock_data,
             }
+            print("plot of quantile: ", quantile_name)
+            backtest.returns_plot()
 
         # 返回包含不同分位数数据的字典
         return result_dict
