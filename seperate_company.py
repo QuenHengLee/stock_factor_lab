@@ -40,7 +40,7 @@ class SeperateCompany:
                     top_n_companies = factor_df.loc[quarter].nsmallest(top_n).index
                 factor_top_n.loc[quarter, top_n_companies] = True
 
-        print(f"Top {top_n} companies ")
+        # print(f"Top {top_n} companies ")
         # print(factor_top_n)
         return factor_top_n
 
@@ -65,8 +65,8 @@ class SeperateCompany:
                 "assets": backtest.assets,
                 "stock_data": backtest.stock_data,
             }
-            print("plot of quantile: ", quantile_name)
-            backtest.returns_plot()
+            # print("plot of quantile: ", quantile_name)
+            # backtest.returns_plot()
 
         # 返回包含不同分位数数据的字典
         return result_dict

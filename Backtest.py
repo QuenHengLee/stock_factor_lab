@@ -45,7 +45,9 @@ class Backtest:
 
         self.calc_weighted_positions()
         self.calculate_assets()
-        self.create_stock_data()
+        # self.create_stock_data()
+        self.stock_data = self.create_stock_data()
+        # print(self.stock_data)
 
     def get_stock_data(self):
         # 範例收盤價資料
@@ -229,83 +231,82 @@ class Backtest:
                 ]
 
     def create_stock_data(self):
-        self.stock_data = self.stock.copy()
-        self.stock_data["portfolio_value"] = self.assets["portfolio_value"]
+        stock_data = self.stock.copy()
+        stock_data["portfolio_value"] = self.assets["portfolio_value"]
 
         # 要回測的股票資料
         stocks = list(self.position.columns)
 
-        for s in stocks:
-            self.stock_data[f"{s}_shares"] = self.shares_df[s]
-            self.stock_data[f"{s}_value"] = self.shares_df[s] * self.stock[s]
-
-        self.stock_data["portfolio_returns"] = np.divide(
-            (
-                self.stock_data["portfolio_value"]
-                - self.stock_data["portfolio_value"].shift(1)
-            ),
-            self.stock_data["portfolio_value"].shift(1),
-        )
-        for s in stocks:
-            self.stock_data[f"{s}_returns"] = np.divide(
-                (self.stock_data[s] - self.stock_data[s].shift(1)),
-                self.stock_data[s].shift(1),
-            )
-
-        self.stock_data.fillna(0, inplace=True)
-        self.stock_data.replace([np.inf], 0, inplace=True)
-
-    def returns_plot(self):
-        stocks = list(self.position.columns)
-
-        # Create subplot layout
-        fig = make_subplots(
-            rows=2,
-            cols=2,
-            subplot_titles=(
-                "Portfolio Returns",
-                "Asset Returns",
-                "Shares Holding per Asset",
-                "Weights per Asset",
-            ),
-        )
-
-        # Add traces to the subplots
-        fig.add_trace(
-            go.Scatter(
-                x=self.stock_data.index,
-                y=self.stock_data["portfolio_returns"].cumsum(),
-                name="Portfolio",
-            ),
-            row=1,
-            col=1,
-        )
+        # log return
+        stock_data["portfolio_returns"] = np.log(
+            stock_data["portfolio_value"].astype("float")
+        ).diff(1)
 
         for s in stocks:
-            fig.add_trace(
-                go.Scatter(
-                    x=self.stock_data.index,
-                    y=self.stock_data[f"{s}_returns"].cumsum(),
-                    name=f"{s}",
-                ),
-                row=1,
-                col=2,
-            )
-            fig.add_trace(
-                go.Scatter(x=self.shares_df.index, y=self.shares_df[s], name=f"{s}"),
-                row=2,
-                col=1,
-            )
-            fig.add_trace(
-                go.Scatter(x=self.stock_data.index, y=self.position[s], name=f"{s}"),
-                row=2,
-                col=2,
+            stock_data[f"{s}_shares"] = self.shares_df[s]
+            stock_data[f"{s}_value"] = self.shares_df[s] * self.stock[s]
+            stock_data[f"{s}_returns"] = np.divide(
+                (stock_data[s] - stock_data[s].shift(1)), stock_data[s].shift(1)
             )
 
-        # Update subplot layout
-        fig.update_layout(
-            height=800, width=1200, title="Strategy Overview", showlegend=False
-        )
+        # stock_data['portfolio_returns'] = np.divide((stock_data['portfolio_value'] - stock_data['portfolio_value'].shift(1)), stock_data['portfolio_value'].shift(1))
+        stock_data.fillna(0, inplace=True)
+        stock_data.replace([np.inf], 0, inplace=True)
 
-        # Display the plot
-        fig.show()
+        return stock_data
+
+    # def returns_plot(self):
+    #     stocks = list(self.position.columns)
+
+    #     # Create subplot layout
+    #     fig = make_subplots(
+    #         rows=2,
+    #         cols=2,
+    #         subplot_titles=(
+    #             "Portfolio Returns",
+    #             "Asset Returns",
+    #             "Shares Holding per Asset",
+    #             "Weights per Asset",
+    #         ),
+    #     )
+
+    #     # Add traces to the subplots
+    #     fig.add_trace(
+    #         go.Scatter(
+    #             x=self.stock_data.index,
+    #             # y=self.stock_data["portfolio_returns"].cumsum(),
+    #             y=np.exp(np.cumsum(self.stock_data["portfolio_returns"])) - 1,
+    #             name="Portfolio",
+    #         ),
+    #         row=1,
+    #         col=1,
+    #     )
+
+    #     for s in stocks:
+    #         fig.add_trace(
+    #             go.Scatter(
+    #                 x=self.stock_data.index,
+    #                 y=self.stock_data[f"{s}_returns"].cumsum(),
+    #                 name=f"{s}",
+    #             ),
+    #             row=1,
+    #             col=2,
+    #         )
+    #         fig.add_trace(
+    #             go.Scatter(x=self.shares_df.index, y=self.shares_df[s], name=f"{s}"),
+    #             row=2,
+    #             col=1,
+    #         )
+    #         fig.add_trace(
+    #             go.Scatter(x=self.stock_data.index, y=self.position[s], name=f"{s}"),
+    #             row=2,
+    #             col=2,
+    #         )
+
+    #     # Update subplot layout
+    #     fig.update_layout(
+    #         height=800, width=1200, title="Strategy Overview", showlegend=False
+    #     )
+
+    #     # Display the plot
+    #     fig.show()

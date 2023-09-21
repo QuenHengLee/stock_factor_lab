@@ -12,13 +12,14 @@ class Plot:
     def plot(
         self,
         backtest_result,
+        index="portfolio_value",
     ):
         size = len(backtest_result)
         # 假設有N組quantile，將它們存儲在一個名為 quantile_values 的列表中
         series_list = []
         size = len(backtest_result)
         for i in range(1, size + 1):
-            tmp = backtest_result[f"Quantile {i}"]["assets"]["portfolio_value"]
+            tmp = backtest_result[f"Quantile {i}"]["stock_data"][index]
             series_list.append(tmp)
 
         # 使用pd.concat()将Series合并成一个DataFrame
@@ -43,7 +44,7 @@ class Plot:
         # 添加标题和标签
         plt.title("Quantile Backtest Result")
         plt.xlabel("Time Period")
-        plt.ylabel("portfolio_value")
+        plt.ylabel(index)
 
         # 显示图例
         plt.legend(loc="best")
