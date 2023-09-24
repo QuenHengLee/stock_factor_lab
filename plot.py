@@ -36,27 +36,6 @@ class Plot:
         column_names = [f"Quantile {i}" for i in range(1, size + 1)]
         df.columns = column_names
 
-        # 设置Seaborn的风格
-        # sns.set(style="darkgrid")
-
-        # # 创建一个绘图
-        # plt.figure(figsize=(10, 6))  # 设置图形的大小
-
-        # # 使用Seaborn的lineplot函数绘制N个折线图
-        # # 将每个Series的数据列名传递给x和y参数，并使用hue参数指定颜色分组
-        # sns.lineplot(data=df, markers=True, dashes=False)  # 可以根据需要自定义其他参数
-
-        # # 添加标题和标签
-        # plt.title("Quantile Backtest Result")
-        # plt.xlabel("Time Period")
-        # plt.ylabel(index)
-
-        # # 显示图例
-        # plt.legend(loc="best")
-
-        # # 显示图形
-        # plt.show()
-
         # 另一種動態互動套件畫圖
         # 使用Plotly Express繪製折線圖
         fig = px.line(df, x=df.index, y=df.columns, title=index + "折線圖")
