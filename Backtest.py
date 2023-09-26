@@ -10,9 +10,7 @@ class Backtest():
         self.init_portfolio_value = init_portfolio_value
 
         # position
-        self.position = position
-        self.position_limit = position_limit
-        self.position.index = pd.to_datetime(self.position.index)
+        self.position = self.calc_weighted_positions(position, position_limit)
 
         # 取得股價資料
         self.stock = self.get_stock_data()
@@ -29,12 +27,11 @@ class Backtest():
         self.shares_df = pd.DataFrame(0, index=self.stock.index, columns=self.stock.columns.drop(["signal"]))
         self.prev_values = {}
 
-        self.calc_weighted_positions()
         self.calculate_assets()
         self.stock_data = self.create_stock_data()
 
     def get_stock_data(self):
-        stock = pd.read_csv('./Data/test/股價.csv').set_index('date')
+        stock = pd.read_csv('../Data/test/股價.csv').set_index('date')
         # 讓日期格式一致
         stock.index = pd.to_datetime(stock.index, format='%Y/%m/%d')
         stock.ffill(inplace=True)
@@ -42,11 +39,15 @@ class Backtest():
         stock = stock.loc[stock.index.isin(self.position.index)]
         return stock
 
-    def calc_weighted_positions(self):  # 計算權重
+    def calc_weighted_positions(self,position, position_limit):  # 計算權重
+        position.index = pd.to_datetime(position.index)
+
         # 統一日期
-        self.total_weight = self.position.abs().sum(axis=1)
-        self.position = self.position.div(self.total_weight.where(self.total_weight != 0, np.nan), axis = 0) \
-                        .fillna(0).clip(-abs(self.position_limit), abs(self.position_limit))
+        total_weight = position.abs().sum(axis=1)
+        position = position.div(total_weight.where(total_weight != 0, np.nan), axis = 0) \
+                        .fillna(0).clip(-abs(position_limit), abs(position_limit))
+        
+        return position
 
     def calculate_assets(self):
         first_trading = True
@@ -149,7 +150,6 @@ class Backtest():
         for s in stocks:
             stock_data[f'{s}_shares'] = self.shares_df[s]
             stock_data[f'{s}_value'] = self.shares_df[s] * self.stock[s]
-            stock_data[f'{s}_returns'] = np.divide((stock_data[s] - stock_data[s].shift(1)), stock_data[s].shift(1))
   
         stock_data.fillna(0, inplace=True)
         stock_data.replace([np.inf], 0, inplace=True)
@@ -158,20 +158,14 @@ class Backtest():
 
     def returns_plot(self):
         stocks = list(self.position.columns)
+        fig = go.Figure()
 
-        # Create subplot layout
-        fig = make_subplots(rows=2, cols=2, subplot_titles=('Portfolio Returns', 'Asset Returns', 'Shares Holding per Asset', 'Weights per Asset'))
-
-        # Add traces to the subplots
         fig.add_trace(go.Scatter(x=self.stock_data.index, y=np.exp(np.cumsum(self.stock_data['portfolio_returns']))-1, name='Portfolio'), row=1, col=1)
 
-        for s in stocks:
-            fig.add_trace(go.Scatter(x=self.stock_data.index, y=self.stock_data[f'{s}_returns'].cumsum(), name=f'{s}'), row=1, col=2)
-            fig.add_trace(go.Scatter(x=self.shares_df.index, y=self.shares_df[s], name=f'{s}'), row=2, col=1)
-            fig.add_trace(go.Scatter(x=self.stock_data.index, y=self.position[s], name=f'{s}'), row=2, col=2)
-
-        # Update subplot layout
-        fig.update_layout(height=800, width=1200, title='Strategy Overview', showlegend=False)
-
-        # Display the plot
+        fig.update_layout(title='Portfolio cumulative Returns',
+                        xaxis_title='Date',
+                        yaxis_title='Returns',
+                        width=800,
+                        height=400)
+        
         fig.show()
