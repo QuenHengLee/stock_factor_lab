@@ -9,11 +9,7 @@ class Plot:
     def __init__(self):
         pass
 
-    def plot(
-        self,
-        backtest_result,
-        index="portfolio_value",
-    ):
+    def plot(self, backtest_result, index="portfolio_value", N=0):
         """
         INPUT: backtest_result各quantile的回測結果, index要畫的指標
         OUTPUT: 折線圖表
@@ -23,6 +19,10 @@ class Plot:
         # 假設有N組quantile，將它們存儲在一個名為 quantile_values 的列表中
         series_list = []
         size = len(backtest_result)
+        # if N == 0:
+        #     backtest_result = backtest_result
+        # else:
+        #     backtest_result = backtest_result[f"Quantile {N}"]
         for i in range(1, size + 1):
             tmp = backtest_result[f"Quantile {i}"]["stock_data"][index]
             series_list.append(tmp)
