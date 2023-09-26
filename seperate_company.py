@@ -44,32 +44,34 @@ class SeperateCompany:
         # print(factor_top_n)
         return factor_top_n
 
-    """
-    INPUT: self, 已經被切成N等分的Datafram
-    OUTPUT: 存放各個quantile的回測結果的dict
-    FUNCTION: 計算各個quantile的回測結果
-    """
+    def backtest_all_quantile(self, factor_dict, quantile=4, N=0):
+        """
+        INPUT: self, 已經被切成N等分的Datafram
+        OUTPUT: 存放各個quantile的回測結果的dict
+        FUNCTION: 計算各個quantile的回測結果
+        """
+        all_result_dict = {}
+        for factor, factor_df in factor_dict.items():
+            quantile_dict = self.get_quantile_factor(factor_df, quantile)
+            # 创建一个字典，用于存储不同分位数的数据
+            result_dict = {}
 
-    def backtest_all_quantile(self, quantile_dict):
-        # 创建一个字典，用于存储不同分位数的数据
-        result_dict = {}
+            for quantile_name, quantile_df in quantile_dict.items():
+                # 創建一個Backtest對象
+                backtest = Backtest(quantile_df)
 
-        for quantile_name, quantile_df in quantile_dict.items():
-            # 創建一個Backtest對象
-            backtest = Backtest(quantile_df)
-
-            # 将每个分位数的数据存储到字典中
-            result_dict[quantile_name] = {
-                "position": backtest.position,
-                "shares_df": backtest.shares_df,
-                "assets": backtest.assets,
-                "stock_data": backtest.stock_data,
-            }
-            # print("plot of quantile: ", quantile_name)
-            # backtest.returns_plot()
-
+                # 将每个分位数的数据存储到字典中
+                result_dict[quantile_name] = {
+                    "position": backtest.position,
+                    "shares_df": backtest.shares_df,
+                    "assets": backtest.assets,
+                    "stock_data": backtest.stock_data,
+                }
+                # print("plot of quantile: ", quantile_name)
+                # backtest.returns_plot()
+            all_result_dict[factor] = result_dict
         # 返回包含不同分位数数据的字典
-        return result_dict
+        return all_result_dict
 
     """
     INPUT: self, 存放單一因子指標的Datafram, 切割成N等分
