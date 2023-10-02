@@ -1,4 +1,3 @@
-import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
@@ -37,6 +36,8 @@ class Backtest():
         stock.ffill(inplace=True)
         stock = stock.asfreq('D', method='ffill')
         stock = stock.loc[stock.index.isin(self.position.index)]
+        # 新增現金選項
+        stock['cash'] = 1
         return stock
 
     def calc_weighted_positions(self,position, position_limit):  # 計算權重
@@ -47,6 +48,7 @@ class Backtest():
         position = position.div(total_weight.where(total_weight != 0, np.nan), axis = 0) \
                         .fillna(0).clip(-abs(position_limit), abs(position_limit))
         
+        position['cash'] = 1-position.sum(axis=1)
         return position
 
     def calculate_assets(self):
@@ -142,7 +144,7 @@ class Backtest():
         stock_data['portfolio_value'] = self.assets['portfolio_value']
         
         # 要回測的股票資料
-        stocks = list(self.position.columns)
+        stocks = list(self.position.drop(['cash'], axis=1).columns)
 
         # log return
         stock_data['portfolio_returns'] = np.log(stock_data['portfolio_value'].astype('float')).diff(1)
@@ -150,7 +152,8 @@ class Backtest():
         for s in stocks:
             stock_data[f'{s}_shares'] = self.shares_df[s]
             stock_data[f'{s}_value'] = self.shares_df[s] * self.stock[s]
-  
+
+        stock_data['現金'] = self.shares_df['cash']
         stock_data.fillna(0, inplace=True)
         stock_data.replace([np.inf], 0, inplace=True)
 
