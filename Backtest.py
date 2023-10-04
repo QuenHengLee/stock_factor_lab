@@ -96,11 +96,12 @@ class Backtest():
             else : 
                 if first_trading:
                     first_trading = False
-                    buy_amount = self.init_portfolio_value * self.position.loc[day] / (self.stock.loc[day].drop(['signal']) * (1 + self.buy_extra_cost))
+                    buy_amount = self.init_portfolio_value * self.position.drop(['cash'],axis=1).loc[day] / (self.stock.loc[day].drop(['signal','cash']) * (1 + self.buy_extra_cost))
+                    buy_amount['cash'] = self.init_portfolio_value * self.position.loc[day]['cash'] / self.stock.loc[day]['cash']
                     self.shares_df.loc[day] = np.floor(buy_amount.fillna(0.0))
 
                     portfolio_value = (self.stock.loc[day].drop(['signal']) * self.shares_df.loc[day]).sum()
-                    total_cost = (self.stock.loc[day].drop(['signal']) * self.shares_df.loc[day] * self.buy_extra_cost).sum()
+                    total_cost = (self.stock.loc[day].drop(['signal','cash']) * self.shares_df.loc[day] * self.buy_extra_cost).sum()
                     remain = self.init_portfolio_value - portfolio_value - total_cost
                     sell_money = self.init_portfolio_value
 
@@ -129,7 +130,11 @@ class Backtest():
                                 buy_stock_shares_list[s] = w
 
                         # 把要賣掉的股票*當天收盤價，扣掉手續費&交易稅，加總後就是當次可投入金額
-                        sell_money = ((self.stock.loc[day].drop(['signal']) * pd.Series(sell_stock_shares_list)).sum() * (1 - self.sell_extra_cost)) + self.assets.shift(1).loc[day, "remain"]
+                        sell_stock_shares_list = pd.Series(sell_stock_shares_list)
+                        if 'cash' not in sell_stock_shares_list.index:
+                            sell_money = ((self.stock.loc[day].drop(['signal']) * sell_stock_shares_list).sum() * (1 - self.sell_extra_cost)) + self.assets.shift(1).loc[day, "remain"]
+                        else:
+                            sell_money = ((self.stock.loc[day].drop(['signal', 'cash']) * sell_stock_shares_list.drop(['cash'])).sum() * (1 - self.sell_extra_cost)) + self.assets.shift(1).loc[day, "remain"] + sell_stock_shares_list['cash']
                           
                         buy_money_per_stock = sell_money / len(buy_stock_shares_list)
                         remain=0
@@ -147,7 +152,7 @@ class Backtest():
                         # 計算賣掉後剩幾張股票
                         for s, w in sell_stock_shares_list.items():
                             self.shares_df.loc[day, s] = self.prev_values[s] - w
-
+                        
                         sell_cost = ((self.shares_df.shift(1).loc[day] - self.shares_df.loc[day]) * self.stock.loc[day].drop(['signal']) * self.sell_extra_cost).sum()
                         buy_cost = (self.shares_df.loc[day] * self.stock.loc[day].drop(['signal']) * self.buy_extra_cost).sum()
                         total_cost = sell_cost + buy_cost
