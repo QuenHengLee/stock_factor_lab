@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
+from get_data import Data
 
 class Backtest():
     def __init__(self, position, init_portfolio_value = 10**6,  position_limit=1, fee_ratio=1.425/1000, tax_ratio=3/1000):
@@ -31,10 +32,29 @@ class Backtest():
 
     def get_stock_data(self):
         stock = pd.read_csv('../Data/test/股價.csv').set_index('date')
+
+        # 實際收盤價資料
+        data = Data()
+        all_close = data.get("price:close")
+        all_close.index = pd.to_datetime(all_close.index, format="%Y-%m-%d")
+        self.df_dict = {}
+        for symbol, position in self.position.items():
+            start = position.index[0]
+            end = position.index[-1]
+            all_close = all_close[start:end]
+            self.df_dict[symbol] = all_close[symbol]
+        # print("self.df_dict:", self.df_dict)
+
+        # 原本的DF 有開高低收量
+        stock = pd.concat(
+            [self.df_dict[symbol] for symbol in self.position.columns.tolist()],
+            axis=1,
+            keys=self.position.columns.tolist(),
+        )
         # 讓日期格式一致
-        stock.index = pd.to_datetime(stock.index, format='%Y/%m/%d')
+        stock.index = pd.to_datetime(stock.index, format="%Y-%m-%d")
         stock.ffill(inplace=True)
-        stock = stock.asfreq('D', method='ffill')
+        stock = stock.asfreq("D", method="ffill")
         stock = stock.loc[stock.index.isin(self.position.index)]
         # 新增現金選項
         stock['cash'] = 1
