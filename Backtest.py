@@ -14,7 +14,7 @@ class Backtest():
 
         # 取得股價資料
         self.stock = self.get_stock_data()
-        # 取得有買進的訊號，只要任一股票有買進訊號，signal就會是True
+        # # 取得有買進的訊號，只要任一股票有買進訊號，signal就會是True
         self.stock["signal"] = self.position.any(axis=1)
 
         # 買:手續費、賣:手續費 + 交易稅
@@ -31,14 +31,14 @@ class Backtest():
         self.stock_data = self.create_stock_data()
 
     def get_stock_data(self):
-        stock = pd.read_csv('../Data/test/股價.csv').set_index('date')
+        # stock = pd.read_csv('../Data/test/股價.csv').set_index('date')
 
         # 實際收盤價資料
         data = Data()
         all_close = data.get("price:close")
         all_close.index = pd.to_datetime(all_close.index, format="%Y-%m-%d")
         self.df_dict = {}
-        for symbol, position in self.position.items():
+        for symbol, position in self.position.drop(['cash'], axis=1).items():
             start = position.index[0]
             end = position.index[-1]
             all_close = all_close[start:end]
@@ -47,7 +47,7 @@ class Backtest():
 
         # 原本的DF 有開高低收量
         stock = pd.concat(
-            [self.df_dict[symbol] for symbol in self.position.columns.tolist()],
+            [self.df_dict[symbol] for symbol in self.position.drop(['cash'],axis=1).columns.tolist()],
             axis=1,
             keys=self.position.columns.tolist(),
         )
@@ -180,10 +180,9 @@ class Backtest():
         return stock_data
 
     def returns_plot(self):
-        stocks = list(self.position.columns)
         fig = go.Figure()
 
-        fig.add_trace(go.Scatter(x=self.stock_data.index, y=np.exp(np.cumsum(self.stock_data['portfolio_returns']))-1, name='Portfolio'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=self.stock_data.index, y=np.exp(np.cumsum(self.stock_data['portfolio_returns']))-1, name='Portfolio'))
 
         fig.update_layout(title='Portfolio cumulative Returns',
                         xaxis_title='Date',
@@ -192,3 +191,4 @@ class Backtest():
                         height=400)
         
         fig.show()
+
