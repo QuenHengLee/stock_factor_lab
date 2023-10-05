@@ -1,10 +1,10 @@
 from database import Database
-import talib
+# import talib
 import pandas as pd
 import numpy as np
  
 # Abstract API：
-from talib import abstract
+# from talib import abstract
 
 class Data():
 
