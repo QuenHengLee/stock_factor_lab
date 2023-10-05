@@ -28,7 +28,9 @@ class Backtest():
         self.prev_values = {}
 
         self.calculate_assets()
+
         self.stock_data = self.create_stock_data()
+
 
     def get_stock_data(self):
         # stock = pd.read_csv('../Data/test/股價.csv').set_index('date')
@@ -167,12 +169,13 @@ class Backtest():
     def create_stock_data(self):
         stock_data = self.stock.copy()
         stock_data['portfolio_value'] = self.assets['portfolio_value']
-        
+      
         # 要回測的股票資料
         stocks = list(self.position.drop(['cash'], axis=1).columns)
 
         # log return
         stock_data['portfolio_returns'] = np.log(stock_data['portfolio_value'].astype('float')).diff(1)
+
 
         for s in stocks:
             stock_data[f'{s}_shares'] = self.shares_df[s]
@@ -196,4 +199,5 @@ class Backtest():
                         height=400)
         
         fig.show()
+
 
