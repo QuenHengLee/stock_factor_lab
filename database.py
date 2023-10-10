@@ -52,9 +52,9 @@ class Database:
             # 選取台股(有帶入一些條件，避免數量過多)
             sql = " SELECT company_symbol,name,date,open,high,low,close,volume,market_capital \
                     FROM peiwentest.company RIGHT JOIN peiwentest.stock ON company.id = stock.company_id \
-                    WHERE exchange_name = 'TWSE'"
-            # AND company_symbol>8700 \
-            # AND company_symbol<9000"
+                    WHERE exchange_name = 'TWSE'\
+                    AND company_symbol>8700 \
+                    AND company_symbol<9000"
             # AND date > 2020-01-01"
 
             cursor.execute(sql)
@@ -87,9 +87,9 @@ class Database:
             sql = " SELECT date, company_symbol, factor_name, factor_value \
                     FROM factor RIGHT JOIN factorvalue ON factor.id = factorvalue.factor_id  \
                     LEFT JOIN  company ON factorvalue.company_id = company.id \
-                    WHERE exchange_name='TWSE'"
-            # AND company_symbol>8700 \
-            # AND company_symbol<9000"
+                    WHERE exchange_name='TWSE'\
+                    AND company_symbol>8700 \
+                    AND company_symbol<9000"
             # AND date > 2020-01-01"
 
             cursor.execute(sql)

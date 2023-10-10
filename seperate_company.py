@@ -46,7 +46,12 @@ class SeperateCompany:
         return factor_top_n
 
     def backtest_all_quantile(
-        self, factor_dict, quantile=4, start_date="2015-01-01", end_date="2019-01-01"
+        self,
+        factor_dict,
+        quantile=4,
+        start_date="2015-01-01",
+        end_date="2019-01-01",
+        frequency="Q",
     ):
         """
         INPUT: self, 已經被切成N等分的Datafram
@@ -74,7 +79,7 @@ class SeperateCompany:
                 # 創建一個Backtest對象
                 # 帶入position直為quantile_df
                 backtest = Backtest(quantile_df)
-                print("~~quantile_df: ", quantile_df)
+                # print("~~quantile_df: ", quantile_df)
                 # 将每个分位数的数据存储到字典中
                 result_dict[quantile_name] = {
                     "position": backtest.position,
