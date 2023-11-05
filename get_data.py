@@ -1,4 +1,5 @@
 from database import Database
+from format_data import *
 # import talib
 import pandas as pd
 import numpy as np
@@ -11,6 +12,7 @@ class Data:
     # 物件初始化: 接收SQL下來DB的資料
     def __init__(self):
         # 與資料庫連線 & 下載全部資料(from database)
+        # 根據config.ini 建立DB連線
         self.db = Database()
         # 初始化stock price 資料
         self.raw_price_data = self.db.get_daily_stock()
@@ -142,9 +144,10 @@ class Data:
 if __name__ == "__main__":
     data = Data()
     # 測試輸出股價資料
-    # close = data.get("price:close")
-    # print("收盤價:", close)
+    close = data.get("price:close")
+    print("收盤價:", close)
     # 測試輸出財報資料
     # roe = data.get("report:roe, EPS")
-    rsi = data.indicator('RSI')
-    print(rsi)
+    # print(roe)
+    # rsi = data.indicator('RSI')
+    # print(rsi)
