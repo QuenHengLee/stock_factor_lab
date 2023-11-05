@@ -51,7 +51,7 @@ class Database:
 
             # 選取台股(有帶入一些條件，避免數量過多)
             sql = " SELECT company_symbol,name,date,open,high,low,close,volume,market_capital \
-                    FROM peiwentest.company RIGHT JOIN peiwentest.stock ON company.id = stock.company_id \
+                    FROM company RIGHT JOIN stock ON company.id = stock.company_id \
                     WHERE exchange_name = 'TWSE'\
                     AND company_symbol>8700 \
                     AND company_symbol<9000"
