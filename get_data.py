@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 # Abstract API：
-# from talib import abstract
+from talib import abstract
 
 
 class Data:
@@ -105,6 +105,38 @@ class Data:
         print(f"DataFrame for factor_name {factor}:\n")
         # print(dfs_by_id[factor])
         return dfs_by_id[factor]
+    
+    def indicator(self,indname, adjust_price=False, resample='D', market='TW_STOCK', **kwargs):
+        """支援 Talib 和 pandas_ta 上百種技術指標，計算 2000 檔股票、10年的所有資訊。
+
+        在使用這個函式前，需要安裝計算技術指標的 Packages
+
+        * [Ta-Lib](https://github.com/mrjbq7/ta-lib)
+        * [Pandas-ta](https://github.com/twopirllc/pandas-ta)
+
+        Args:
+            indname (str): 指標名稱，
+                以 TA-Lib 舉例，例如 SMA, STOCH, RSI 等，可以參考 [talib 文件](https://mrjbq7.github.io/ta-lib/doc_index.html)。
+
+                以 Pandas-ta 舉例，例如 supertrend, ssf 等，可以參考 [Pandas-ta 文件](https://twopirllc.github.io/pandas-ta/#indicators-by-category)。
+            adjust_price (bool): 是否使用還原股價計算。
+            resample (str): 技術指標價格週期，ex: `D` 代表日線, `W` 代表週線, `M` 代表月線。
+            market (str): 市場選擇，ex: `TW_STOCK` 代表台股, `US_STOCK` 代表美股。
+            **kwargs (dict): 技術指標的參數設定，TA-Lib 中的 RSI 為例，調整項為計算週期 `timeperiod=14`。
+        建議使用者可以先參考以下範例，並且搭配 talib官方文件，就可以掌握製作技術指標的方法了。
+        """
+        # df 為存放單一公司所有日期的開高低收量資料(col小寫)
+        result = eval('abstract.'+indname+'(df)')
+        if isinstance(result, pd.core.frame.DataFrame):
+            # 如果是DataFrame，表示有多個回傳值
+            # 這裡可以動態處理不確定數量的回傳值和欄位名稱
+            return [result[col_name] for col_name in result.columns]
+        elif isinstance(result, pd.Series):
+            # 如果是Series，表示只有一個回傳值
+            # 直接將該回傳值作為單一元素回傳
+            return result
+            
+
 
 
 if __name__ == "__main__":
@@ -113,4 +145,6 @@ if __name__ == "__main__":
     # close = data.get("price:close")
     # print("收盤價:", close)
     # 測試輸出財報資料
-    roe = data.get("report:roe, EPS")
+    # roe = data.get("report:roe, EPS")
+    rsi = data.indicator('RSI')
+    print(rsi)
