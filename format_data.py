@@ -38,3 +38,21 @@ def handle_price_data(raw_price_data):
         "market_capital": all_market_capital,
     }
     return all_price_dict
+
+
+def get_each_company_daily_price(raw_price_data, company_symbol):
+
+    # 使用布林索引過濾 DataFrame，擷取 "加工業" 種類的收盤價資料
+    filtered_df = raw_price_data[raw_price_data["company_symbol"] == company_symbol]
+    filtered_df.set_index("date", inplace=True)
+    # 升序排序日期索引
+    filtered_df = filtered_df.sort_index(ascending=True)
+
+    return filtered_df
+
+def get_all_company_symbol(raw_price_data):
+    # 找出 "symbol" 列中的所有不重複值
+    unique_symbols = raw_price_data["company_symbol"].drop_duplicates()
+    unique_symbols_list = unique_symbols.tolist()
+
+    return unique_symbols_list
