@@ -2,6 +2,8 @@
 # 這些function是將原始DB TABLE的資料轉成get() api可用格式
 
 import pandas as pd
+# Abstract API：
+from talib import abstract
 
 def format_price_data(raw_price_data, item):
     """
@@ -96,3 +98,20 @@ def get_all_company_symbol(raw_price_data):
     unique_symbols = raw_price_data["company_symbol"].drop_duplicates()
     unique_symbols_list = unique_symbols.tolist()
     return unique_symbols_list
+
+
+def get_number_of_indicator_return(indname,tmp_company_daily_price):
+    # 先根據該指標會回傳幾個DF來宣告
+    # 隨便帶入一間公司做運算
+    # tmp_company_daily_price = get_each_company_daily_price(self.raw_price_data, company_symbol)
+    tmp_result = eval('abstract.'+indname+'(tmp_company_daily_price)')
+    if isinstance(tmp_result, pd.core.frame.DataFrame):
+        # 如果是DataFrame，表示有多個回傳值
+        num_of_return = tmp_result.shape[1]
+        # print("回傳數量: ",num_of_return)  
+        return num_of_return
+    elif isinstance(tmp_result, pd.Series):
+        # 如果是Series，表示只有一個回傳值
+        # 直接將該回傳值作為單一元素回傳
+        # print("回傳數量: ",1)
+        return 1

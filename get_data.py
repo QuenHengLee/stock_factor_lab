@@ -1,10 +1,12 @@
 from database import Database
-from format_data import format_price_data, format_report_data, handle_price_data, get_each_company_daily_price,get_all_company_symbol
-# import talib
+from format_data import *
+import talib
 import pandas as pd
 import numpy as np
+
 # Abstract API：
 from talib import abstract
+
 
 class Data:
     # 物件初始化: 接收SQL下來DB的資料
@@ -21,17 +23,19 @@ class Data:
     # 從format_data取得處理後得資料
     def format_price_data(self, item):
         return format_price_data(self.raw_price_data, item)
+
     def format_report_data(self, factor):
         return format_report_data(self.raw_report_data, factor)
+
     def handle_price_data(self):
         return handle_price_data(self.raw_price_data)
-    
 
     """
     INPUT: self, dataset(str)帶入想要的資料名稱Ex. price:close、report:roe
     OUTPUT: 一個內容為所有公司股價/財報相關資料的Dataframe
     FUNCTION: 從DB中取得資料
     """
+
     # 取得資料起點
     def get(self, dataset):
         # 使用 lower() 方法將字串轉換為小寫
@@ -66,42 +70,57 @@ class Data:
         else:
             print("目前資料來源有price、report")
 
-    def indicator(self,indname, adjust_price=False, resample='D', market='TW_STOCK', **kwargs):
-        """支援 Talib 和 pandas_ta 上百種技術指標，計算 2000 檔股票、10年的所有資訊。
-
-        在使用這個函式前，需要安裝計算技術指標的 Packages
-
-        * [Ta-Lib](https://github.com/mrjbq7/ta-lib)
-        * [Pandas-ta](https://github.com/twopirllc/pandas-ta)
-
-        Args:
-            indname (str): 指標名稱，
-                以 TA-Lib 舉例，例如 SMA, STOCH, RSI 等，可以參考 [talib 文件](https://mrjbq7.github.io/ta-lib/doc_index.html)。
-
-                以 Pandas-ta 舉例，例如 supertrend, ssf 等，可以參考 [Pandas-ta 文件](https://twopirllc.github.io/pandas-ta/#indicators-by-category)。
-            adjust_price (bool): 是否使用還原股價計算。
-            resample (str): 技術指標價格週期，ex: `D` 代表日線, `W` 代表週線, `M` 代表月線。
-            market (str): 市場選擇，ex: `TW_STOCK` 代表台股, `US_STOCK` 代表美股。
-            **kwargs (dict): 技術指標的參數設定，TA-Lib 中的 RSI 為例，調整項為計算週期 `timeperiod=14`。
-        建議使用者可以先參考以下範例，並且搭配 talib官方文件，就可以掌握製作技術指標的方法了。
-        """
-        # 先取得所有公司，因為計算指標是一間一間算
+    def indicator(
+        self, indname, adjust_price=False, resample="D", market="TW_STOCK", **kwargs
+    ):
+        # 先取得所有公司list，因為計算指標是一間一間算
         all_company_symbol = get_all_company_symbol(data.raw_price_data)
-        for company_symbol in all_company_symbol:
-            df = get_each_company_daily_price(self.raw_price_data, company_symbol)
-            # df 為存放單一公司所有日期的開高低收量資料(col小寫)
-            result = eval('abstract.'+indname+'(df)')
-            
-        if isinstance(result, pd.core.frame.DataFrame):
-            # 如果是DataFrame，表示有多個回傳值
-            # 這裡可以動態處理不確定數量的回傳值和欄位名稱
-            return [result[col_name] for col_name in result.columns]
-        elif isinstance(result, pd.Series):
-            # 如果是Series，表示只有一個回傳值
-            # 直接將該回傳值作為單一元素回傳
-            return result
-            
 
+        # 先計算該指標會回傳幾個值
+        tmp_company_daily_price = get_each_company_daily_price(
+            self.raw_price_data, all_company_symbol[0]
+        )
+        num_of_return = get_number_of_indicator_return(indname, tmp_company_daily_price)
+
+        # 再根據回傳值的數量動態宣告N個dataframe在一個tuple中
+        empty_dataframe = pd.DataFrame()
+        dataframe_tuple = tuple()
+        # 複製空的df到tuple中
+        for _ in range(num_of_return):
+            df = empty_dataframe.copy()
+            dataframe_tuple += (df,)
+
+        # 用巢狀迴圈逐一填入N公司的M個回傳指標資料
+        for i in range(num_of_return):
+            for company_symbol in all_company_symbol:
+                df = get_each_company_daily_price(self.raw_price_data, company_symbol)
+                # df 為存放單一公司所有日期的開高低收量資料(col小寫)
+                result = eval("abstract." + indname + "(df)")
+                # 假如只有回傳一個值，回以series呈現，這邊要轉成dataframe
+                if isinstance(result, pd.Series):
+                    result = result.to_frame()
+                else:
+                    pass  # df不用再轉df
+                dataframe_tuple[i][company_symbol] = result.iloc[:, i]
+
+        if num_of_return == 1:
+            return dataframe_tuple[0]
+        else:
+            return dataframe_tuple
+        # result_df = pd.DataFrame()
+        # for company_symbol in all_company_symbol:
+        #     df = get_each_company_daily_price(self.raw_price_data, company_symbol)
+        #     # print(df)
+        #     # df 為存放單一公司所有日期的開高低收量資料(col小寫)
+        #     result_series = eval('abstract.'+indname+'(df)')
+
+        #     result_df[company_symbol] = result_series
+
+        # print(result_df)
+
+        # df = get_each_company_daily_price(self.raw_price_data, '8905')
+        # result_series = eval('abstract.'+indname+'(df)')
+        # print(result_series)
 
 
 if __name__ == "__main__":
@@ -119,5 +138,14 @@ if __name__ == "__main__":
     # price = data.handle_price_data()
     # print(price)
 
-    all_companys = get_all_company_symbol(data.raw_price_data)
-    print(all_companys)
+    # all_companys = get_all_company_symbol(data.raw_price_data)
+    # print(all_companys)
+
+    a, b, c = data.indicator("MACD")
+    a
+    b
+    c
+
+    a = data.indicator("CCI")
+    type(a)
+    a
