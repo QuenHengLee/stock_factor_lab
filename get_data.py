@@ -158,8 +158,18 @@ class Data:
         # result 可能是一個DataFrame 或多個DataFrames 的元組，視指標計算的結果而定。
         ```
         """
+
+        # 先處理一下計算indicator需要用到的kwargs
+        # 使用列表推導式將字典轉換為字串形式的鍵值對
+        key_value_pairs = [f"{key}={value}" for key, value in kwargs.items()]
+        # 使用逗號和空格將鍵值對連接起來
+        kwargs_result_str = ", ".join(key_value_pairs)
+        kwargs_result_str = "," + kwargs_result_str
+        # 打印結果
+        # print(kwargs_result_str)
+
         # 先取得所有公司list，因為計算指標是一間一間算
-        all_company_symbol = get_all_company_symbol(data.raw_price_data)
+        all_company_symbol = get_all_company_symbol(self.raw_price_data)
 
         # 先計算該指標會回傳幾個值
         tmp_company_daily_price = get_each_company_daily_price(
@@ -180,7 +190,9 @@ class Data:
             for company_symbol in all_company_symbol:
                 df = get_each_company_daily_price(self.raw_price_data, company_symbol)
                 # df 為存放單一公司所有日期的開高低收量資料(col小寫)
-                result = eval("abstract." + indname + "(df)")
+                tmp_eval_str = "abstract." + indname + "(df" + kwargs_result_str + ")"
+                # print("執行字串: ", tmp_eval_str)
+                result = eval(tmp_eval_str)
                 # 假如只有回傳一個值，回以series呈現，這邊要轉成dataframe
                 if isinstance(result, pd.Series):
                     result = result.to_frame()
@@ -212,11 +224,8 @@ if __name__ == "__main__":
     # all_companys = get_all_company_symbol(data.raw_price_data)
     # print(all_companys)
 
-    a, b, c = data.indicator("MACD")
+    a = adx = data.indicator("ADX")
     a
-    b
-    c
 
-    a = data.indicator("CCI")
-    type(a)
-    a
+    b = adx = data.indicator("ADX", timeperiod=50)
+    b

@@ -2,8 +2,10 @@
 # 這些function是將原始DB TABLE的資料轉成get() api可用格式
 
 import pandas as pd
+
 # Abstract API：
 from talib import abstract
+
 
 def format_price_data(raw_price_data, item):
     """
@@ -22,6 +24,7 @@ def format_price_data(raw_price_data, item):
     )
     return pivot_data
 
+
 def format_report_data(raw_report_data, factor):
     """
     格式化原始報告資料成不同因子的DataFrame字典。
@@ -36,12 +39,13 @@ def format_report_data(raw_report_data, factor):
     unique_ids = raw_report_data["factor_name"].unique()
     dfs_by_id = {}
     for unique_id in unique_ids:
-        temp_df = raw_report_data[
-            raw_report_data["factor_name"] == unique_id
-        ].pivot(index="date", columns="company_symbol", values="factor_value")
+        temp_df = raw_report_data[raw_report_data["factor_name"] == unique_id].pivot(
+            index="date", columns="company_symbol", values="factor_value"
+        )
         dfs_by_id[unique_id] = temp_df
 
     return dfs_by_id[factor]
+
 
 def handle_price_data(raw_price_data):
     """
@@ -69,6 +73,7 @@ def handle_price_data(raw_price_data):
     }
     return all_price_dict
 
+
 def get_each_company_daily_price(raw_price_data, company_symbol):
     """
     獲取特定公司的每日價格資料。
@@ -85,6 +90,7 @@ def get_each_company_daily_price(raw_price_data, company_symbol):
     filtered_df = filtered_df.sort_index(ascending=True)
     return filtered_df
 
+
 def get_all_company_symbol(raw_price_data):
     """
     獲取原始價格資料中所有獨特的公司代號清單。
@@ -100,15 +106,31 @@ def get_all_company_symbol(raw_price_data):
     return unique_symbols_list
 
 
-def get_number_of_indicator_return(indname,tmp_company_daily_price):
+def get_number_of_indicator_return(indname, tmp_company_daily_price):
+    """
+    確定指標會回傳多少個DataFrame或單一值。
+
+    Args:
+    indname (str): 要計算的指標名稱。
+    tmp_company_daily_price (pandas.DataFrame): 包含一間公司每日價格資料的DataFrame。
+
+    Returns:
+    int: 回傳值的數量，如果該指標回傳多個DataFrame，則為DataFrame的欄位數量；如果只回傳單一值，則為1。
+
+    註解:
+    - 此函數用於確定指標的回傳值數量，以便在後續處理中進行適當的資料處理。
+    - 函數通過呼叫指定的指標函數（`indname`）來取得結果，然後檢查結果的型別來確定回傳值的數量。
+    - 如果結果是DataFrame，則表示有多個回傳值，回傳其欄位數量。
+    - 如果結果是Series，則表示只有單一回傳值，回傳1。
+    """
     # 先根據該指標會回傳幾個DF來宣告
     # 隨便帶入一間公司做運算
     # tmp_company_daily_price = get_each_company_daily_price(self.raw_price_data, company_symbol)
-    tmp_result = eval('abstract.'+indname+'(tmp_company_daily_price)')
+    tmp_result = eval("abstract." + indname + "(tmp_company_daily_price)")
     if isinstance(tmp_result, pd.core.frame.DataFrame):
         # 如果是DataFrame，表示有多個回傳值
         num_of_return = tmp_result.shape[1]
-        # print("回傳數量: ",num_of_return)  
+        # print("回傳數量: ",num_of_return)
         return num_of_return
     elif isinstance(tmp_result, pd.Series):
         # 如果是Series，表示只有一個回傳值
