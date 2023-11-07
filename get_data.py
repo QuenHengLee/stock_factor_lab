@@ -9,35 +9,84 @@ from talib import abstract
 
 
 class Data:
-    # 物件初始化: 接收SQL下來DB的資料
     def __init__(self):
-        # 與資料庫連線 & 下載全部資料(from database)
-        # 根據config.ini 建立DB連線
+        """
+        初始化物件，連接資料庫並下載相關資料。
+
+        Args:
+            self: 類的實例（通常是類的物件，不需要額外指定）。
+        """
+        # 連接資料庫並下載股價資料
         self.db = Database()
-        # 初始化stock price 資料
         self.raw_price_data = self.db.get_daily_stock()
         self.all_price_dict = self.handle_price_data()
-        # 初始化stock price 資料
+        # 下載財報資料
         self.raw_report_data = self.db.get_finance_report()
 
-    # 從format_data取得處理後得資料
     def format_price_data(self, item):
+        """
+        從原始股價資料中處理特定項目的資料。
+
+        Args:
+            item (str): 要處理的項目名稱。
+
+        Returns:
+            pandas.DataFrame: 處理後的股價資料的DataFrame。
+        """
         return format_price_data(self.raw_price_data, item)
 
     def format_report_data(self, factor):
+        """
+        從原始財報資料中處理特定因子的資料。
+
+        Args:
+            factor (str): 要處理的財報因子名稱。
+
+        Returns:
+            pandas.DataFrame: 處理後的財報資料的DataFrame。
+        """
         return format_report_data(self.raw_report_data, factor)
 
     def handle_price_data(self):
-        return handle_price_data(self.raw_price_data)
+        """
+        處理原始股價資料並返回一個字典。
 
-    """
-    INPUT: self, dataset(str)帶入想要的資料名稱Ex. price:close、report:roe
-    OUTPUT: 一個內容為所有公司股價/財報相關資料的Dataframe
-    FUNCTION: 從DB中取得資料
-    """
+        Returns:
+            dict: 包含處理後的股價資料的字典。
+        """
+        return handle_price_data(self.raw_price_data)
 
     # 取得資料起點
     def get(self, dataset):
+        """
+        從資料庫中取得資料並返回相應的DataFrame。
+
+        Args:
+            self: 類的實例（通常是類的物件，不需要額外指定）。
+            dataset (str): 想要的資料名稱，格式如 "price:close" 或 "report:roe"。
+
+        Returns:
+            pandas.DataFrame or dict: 一個包含所有公司股價/財報相關資料的DataFrame 或一個包含多個財報資料的字典。
+
+        註解:
+        - 此方法根據輸入的資料名稱（dataset）擷取相對應的資料。
+        - 如果資料名稱是 "price"，則返回股價相關的DataFrame。
+        - 如果資料名稱是 "report"，則返回多個財報資料的字典，每個財報資料對應一個鍵。
+        - 資料名稱應以冒號分隔，例如 "price:close" 或 "report:roe"。
+        - 如果輸入格式不正確，將列印錯誤訊息。
+
+        使用示例:
+        ```
+        # 創建類的實例
+        my_instance = YourClass()
+        # 呼叫get方法取得股價資料
+        price_data = my_instance.get("price:close")
+        # price_data 可能是一個DataFrame，包含股價相關資料。
+        # 或者呼叫get方法取得多個財報資料
+        report_data = my_instance.get("report:roe,eps")
+        # report_data 是一個字典，包含多個財報資料，例如 {"roe": DataFrame, "eps": DataFrame}。
+        ```
+        """
         # 使用 lower() 方法將字串轉換為小寫
         dataset = dataset.lower()
         # 使用 split() 函數按 ":" 分隔字串
@@ -73,6 +122,42 @@ class Data:
     def indicator(
         self, indname, adjust_price=False, resample="D", market="TW_STOCK", **kwargs
     ):
+        """
+        計算指標並回傳相關數據。
+
+        Args:
+            self: 類的實例（通常是類的物件，不需要額外指定）。
+            indname (str): 要計算的指標名稱。
+            adjust_price (bool): 是否進行價格調整（預設為False）。
+            resample (str): 重新取樣的頻率（預設為"D"，即每日）。
+            market (str): 市場類別（預設為"TW_STOCK"，即台灣股市）。
+            **kwargs: 額外的參數，用於傳遞給其他函數。
+
+        Returns:
+            pandas.DataFrame or tuple of DataFrames: 根據指標回傳值的數量，返回一個DataFrame或包含多個DataFrames的元組。每個DataFrame 包含指標計算的結果。
+
+        功能:
+        1. 先取得所有公司的代號列表（all_company_symbol）。
+        2. 根據第一家公司的代號，計算指標將返回的數量（num_of_return）。
+        3. 創建一個元組（dataframe_tuple）以保存計算結果的DataFrames。
+        4. 使用巢狀迴圈計算每家公司的指標值並填充到相應的DataFrames 中。
+        5. 根據回傳值的數量，返回單個DataFrame 或包含多個DataFrames 的元組。
+
+        註解:
+        - 這個方法的主要功能是計算給定指標（indname）的數值，對每家公司進行計算。
+        - 指標的計算結果可以包含多個值，這些值保存在不同的DataFrames 中。
+        - 回傳值的數量（num_of_return）決定了回傳的數據結構。如果只有一個值，將返回單個DataFrame。
+        - 如果有多個值，將返回一個包含這些DataFrames 的元組。
+
+        使用示例:
+        ```
+        # 創建類的實例
+        my_instance = YourClass()
+        # 呼叫indicator方法計算指標
+        result = my_instance.indicator("SMA", adjust_price=True)
+        # result 可能是一個DataFrame 或多個DataFrames 的元組，視指標計算的結果而定。
+        ```
+        """
         # 先取得所有公司list，因為計算指標是一間一間算
         all_company_symbol = get_all_company_symbol(data.raw_price_data)
 
@@ -107,20 +192,6 @@ class Data:
             return dataframe_tuple[0]
         else:
             return dataframe_tuple
-        # result_df = pd.DataFrame()
-        # for company_symbol in all_company_symbol:
-        #     df = get_each_company_daily_price(self.raw_price_data, company_symbol)
-        #     # print(df)
-        #     # df 為存放單一公司所有日期的開高低收量資料(col小寫)
-        #     result_series = eval('abstract.'+indname+'(df)')
-
-        #     result_df[company_symbol] = result_series
-
-        # print(result_df)
-
-        # df = get_each_company_daily_price(self.raw_price_data, '8905')
-        # result_series = eval('abstract.'+indname+'(df)')
-        # print(result_series)
 
 
 if __name__ == "__main__":
