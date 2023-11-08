@@ -2,6 +2,7 @@
 # 這些function是將原始DB TABLE的資料轉成get() api可用格式
 
 import pandas as pd
+from finlab_data_frame import CustomDataFrame 
 
 # Abstract API：
 from talib import abstract
@@ -22,7 +23,7 @@ def format_price_data(raw_price_data, item):
     pivot_data = selected_data.pivot_table(
         index="date", columns="company_symbol", values=item
     )
-    return pivot_data
+    return CustomDataFrame(pivot_data)
 
 
 def format_report_data(raw_report_data, factor):
@@ -42,7 +43,7 @@ def format_report_data(raw_report_data, factor):
         temp_df = raw_report_data[raw_report_data["factor_name"] == unique_id].pivot(
             index="date", columns="company_symbol", values="factor_value"
         )
-        dfs_by_id[unique_id] = temp_df
+        dfs_by_id[unique_id] = CustomDataFrame(temp_df)
 
     return dfs_by_id[factor]
 

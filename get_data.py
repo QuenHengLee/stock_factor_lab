@@ -1,4 +1,5 @@
 from database import Database
+from finlab_data_frame import CustomDataFrame 
 from format_data import *
 import talib
 import pandas as pd
@@ -178,7 +179,7 @@ class Data:
         num_of_return = get_number_of_indicator_return(indname, tmp_company_daily_price)
 
         # 再根據回傳值的數量動態宣告N個dataframe在一個tuple中
-        empty_dataframe = pd.DataFrame()
+        empty_dataframe = CustomDataFrame()
         dataframe_tuple = tuple()
         # 複製空的df到tuple中
         for _ in range(num_of_return):
