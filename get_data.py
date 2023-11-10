@@ -1,5 +1,5 @@
 from database import Database
-from finlab_data_frame import CustomDataFrame 
+from finlab_data_frame import CustomDataFrame
 from format_data import *
 import talib
 import pandas as pd
@@ -181,13 +181,16 @@ class Data:
         # 再根據回傳值的數量動態宣告N個dataframe在一個tuple中
         empty_dataframe = CustomDataFrame()
         dataframe_tuple = tuple()
-        # 複製空的df到tuple中
-        for _ in range(num_of_return):
-            df = empty_dataframe.copy()
-            dataframe_tuple += (df,)
+        # # 複製空的df到tuple中
+        # for _ in range(num_of_return):
+        #     df = empty_dataframe.copy()
+        #     dataframe_tuple += (df,)
 
+        # 创建一个空的主字典
+        nested_dict = {}
         # 用巢狀迴圈逐一填入N公司的M個回傳指標資料
         for i in range(num_of_return):
+            nested_dict[i] = {}  # 创建一个嵌套字典
             for company_symbol in all_company_symbol:
                 df = get_each_company_daily_price(self.raw_price_data, company_symbol)
                 # df 為存放單一公司所有日期的開高低收量資料(col小寫)
@@ -199,12 +202,22 @@ class Data:
                     result = result.to_frame()
                 else:
                     pass  # df不用再轉df
-                dataframe_tuple[i][company_symbol] = result.iloc[:, i]
+                # 這種方法組合DF，會導致過度碎片化
+                print(result)
+                # dataframe_tuple[i][company_symbol] = result.iloc[:, i]
+                # subkey = company_symbol
+                # value = result.iloc[:, i]
+                # nested_dict[i][subkey] = value
+
+        # # 複製空的df到tuple中
+        # for _ in range(num_of_return):
+        #     # 合并所有的1-D DataFrame成一个2D DataFrame
+        # merged_dataframe = pd.concat(dataframes_dict.values(), axis=1)
 
         if num_of_return == 1:
             return dataframe_tuple[0]
         else:
-            return dataframe_tuple
+            return nested_dict
 
 
 if __name__ == "__main__":
