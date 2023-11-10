@@ -120,104 +120,123 @@ class Data:
         else:
             print("目前資料來源有price、report")
 
-    def indicator(
-        self, indname, adjust_price=False, resample="D", market="TW_STOCK", **kwargs
-    ):
-        """
-        計算指標並回傳相關數據。
+def indicator(indname, adjust_price=False, resample='D', market:Union[str, MarketInfo]='TW_STOCK', **kwargs):
+    """支援 Talib 和 pandas_ta 上百種技術指標，計算 2000 檔股票、10年的所有資訊。
 
-        Args:
-            self: 類的實例（通常是類的物件，不需要額外指定）。
-            indname (str): 要計算的指標名稱。
-            adjust_price (bool): 是否進行價格調整（預設為False）。
-            resample (str): 重新取樣的頻率（預設為"D"，即每日）。
-            market (str): 市場類別（預設為"TW_STOCK"，即台灣股市）。
-            **kwargs: 額外的參數，用於傳遞給其他函數。
+    在使用這個函式前，需要安裝計算技術指標的 Packages
 
-        Returns:
-            pandas.DataFrame or tuple of DataFrames: 根據指標回傳值的數量，返回一個DataFrame或包含多個DataFrames的元組。每個DataFrame 包含指標計算的結果。
+    * [Ta-Lib](https://github.com/mrjbq7/ta-lib)
+    * [Pandas-ta](https://github.com/twopirllc/pandas-ta)
 
-        功能:
-        1. 先取得所有公司的代號列表（all_company_symbol）。
-        2. 根據第一家公司的代號，計算指標將返回的數量（num_of_return）。
-        3. 創建一個元組（dataframe_tuple）以保存計算結果的DataFrames。
-        4. 使用巢狀迴圈計算每家公司的指標值並填充到相應的DataFrames 中。
-        5. 根據回傳值的數量，返回單個DataFrame 或包含多個DataFrames 的元組。
+    Args:
+        indname (str): 指標名稱，
+            以 TA-Lib 舉例，例如 SMA, STOCH, RSI 等，可以參考 [talib 文件](https://mrjbq7.github.io/ta-lib/doc_index.html)。
 
-        註解:
-        - 這個方法的主要功能是計算給定指標（indname）的數值，對每家公司進行計算。
-        - 指標的計算結果可以包含多個值，這些值保存在不同的DataFrames 中。
-        - 回傳值的數量（num_of_return）決定了回傳的數據結構。如果只有一個值，將返回單個DataFrame。
-        - 如果有多個值，將返回一個包含這些DataFrames 的元組。
+            以 Pandas-ta 舉例，例如 supertrend, ssf 等，可以參考 [Pandas-ta 文件](https://twopirllc.github.io/pandas-ta/#indicators-by-category)。
+        adjust_price (bool): 是否使用還原股價計算。
+        resample (str): 技術指標價格週期，ex: `D` 代表日線, `W` 代表週線, `M` 代表月線。
+        market (str): 市場選擇，ex: `TW_STOCK` 代表台股, `US_STOCK` 代表美股。
+        **kwargs (dict): 技術指標的參數設定，TA-Lib 中的 RSI 為例，調整項為計算週期 `timeperiod=14`。
+    建議使用者可以先參考以下範例，並且搭配 talib官方文件，就可以掌握製作技術指標的方法了。
+    """
+    package = None
 
-        使用示例:
-        ```
-        # 創建類的實例
-        my_instance = YourClass()
-        # 呼叫indicator方法計算指標
-        result = my_instance.indicator("SMA", adjust_price=True)
-        # result 可能是一個DataFrame 或多個DataFrames 的元組，視指標計算的結果而定。
-        ```
-        """
+    try:
+        from talib import abstract
+        import talib
+        attr = getattr(abstract, indname)
+        package = 'talib'
+    except:
+        try:
+            import pandas_ta
+            # test df.ta has attribute
+            getattr(pd.DataFrame().ta, indname)
+            attr = lambda df, **kwargs: getattr(df.ta, indname)(**kwargs)
+            package = 'pandas_ta'
+        except:
+            raise Exception(
+                "Please install TA-Lib or pandas_ta to get indicators.")
 
-        # 先處理一下計算indicator需要用到的kwargs
-        # 使用列表推導式將字典轉換為字串形式的鍵值對
-        key_value_pairs = [f"{key}={value}" for key, value in kwargs.items()]
-        # 使用逗號和空格將鍵值對連接起來
-        kwargs_result_str = ", ".join(key_value_pairs)
-        kwargs_result_str = "," + kwargs_result_str
-        # 打印結果
-        # print(kwargs_result_str)
 
-        # 先取得所有公司list，因為計算指標是一間一間算
-        all_company_symbol = get_all_company_symbol(self.raw_price_data)
+    market = get_market_info(user_market_info=market)
 
-        # 先計算該指標會回傳幾個值
-        tmp_company_daily_price = get_each_company_daily_price(
-            self.raw_price_data, all_company_symbol[0]
-        )
-        num_of_return = get_number_of_indicator_return(indname, tmp_company_daily_price)
+    close = market.get_price('close', adj=adjust_price)
+    open_ = market.get_price('open', adj=adjust_price)
+    high = market.get_price('high', adj=adjust_price)
+    low = market.get_price('low', adj=adjust_price)
+    volume = market.get_price('volume', adj=adjust_price)
 
-        # 再根據回傳值的數量動態宣告N個dataframe在一個tuple中
-        empty_dataframe = CustomDataFrame()
-        dataframe_tuple = tuple()
-        # # 複製空的df到tuple中
-        # for _ in range(num_of_return):
-        #     df = empty_dataframe.copy()
-        #     dataframe_tuple += (df,)
+    if resample.upper() != 'D':
+        close = close.resample(resample).last()
+        open_ = open_.resample(resample).first()
+        high = high.resample(resample).max()
+        low = low.resample(resample).min()
+        volume = volume.resample(resample).sum()
 
-        # 创建一个空的主字典
-        nested_dict = {}
-        # 用巢狀迴圈逐一填入N公司的M個回傳指標資料
-        for i in range(num_of_return):
-            nested_dict[i] = {}  # 创建一个嵌套字典
-            for company_symbol in all_company_symbol:
-                df = get_each_company_daily_price(self.raw_price_data, company_symbol)
-                # df 為存放單一公司所有日期的開高低收量資料(col小寫)
-                tmp_eval_str = "abstract." + indname + "(df" + kwargs_result_str + ")"
-                # print("執行字串: ", tmp_eval_str)
-                result = eval(tmp_eval_str)
-                # 假如只有回傳一個值，回以series呈現，這邊要轉成dataframe
-                if isinstance(result, pd.Series):
-                    result = result.to_frame()
-                else:
-                    pass  # df不用再轉df
-                # 這種方法組合DF，會導致過度碎片化
-                print(result)
-                # dataframe_tuple[i][company_symbol] = result.iloc[:, i]
-                # subkey = company_symbol
-                # value = result.iloc[:, i]
-                # nested_dict[i][subkey] = value
+    dfs = {}
+    default_output_columns = None
+    for key in close.columns:
 
-        # # 複製空的df到tuple中
-        # for _ in range(num_of_return):
-        #     # 合并所有的1-D DataFrame成一个2D DataFrame
-        # merged_dataframe = pd.concat(dataframes_dict.values(), axis=1)
+        prices = {'open': open_[key].ffill(),
+                  'high': high[key].ffill(),
+                  'low': low[key].ffill(),
+                  'close': close[key].ffill(),
+                  'volume': volume[key].ffill()}
 
-        if num_of_return == 1:
-            return dataframe_tuple[0]
+        if package == 'pandas_ta':
+            prices = pd.DataFrame(prices)
+            s = attr(prices, **kwargs)
+
+        elif package == 'talib':
+            abstract_input = list(attr.input_names.values())[0]
+            abstract_input = get_input_args(attr)
+
+            # quick fix talib bug
+            if indname == 'OBV':
+                abstract_input = ['close', 'volume']
+
+            if indname == 'BETA':
+                abstract_input = ['high', 'low']
+
+            if isinstance(abstract_input, str):
+                abstract_input = [abstract_input]
+            paras = [prices[k] for k in abstract_input]
+            s = attr(*paras, **kwargs)
         else:
-            return nested_dict
+            raise Exception("Cannot determine technical package from indname")
+
+        if isinstance(s, list):
+            s = {i: series for i, series in enumerate(s)}
+
+        if isinstance(s, np.ndarray):
+            s = {0: s}
+
+        if isinstance(s, pd.Series):
+            s = {0: s.values}
+
+        if isinstance(s, pd.DataFrame):
+            s = {i: series.values for i, series in s.items()}
+
+        if default_output_columns is None:
+            default_output_columns = list(s.keys())
+
+        for colname, series in s.items():
+            if colname not in dfs:
+                dfs[colname] = {}
+            dfs[colname][key] = series if isinstance(
+                series, pd.Series) else series
+
+    newdic = {}
+    for key, df in dfs.items():
+        newdic[key] = pd.DataFrame(df, index=close.index)
+
+    ret = [newdic[n] for n in default_output_columns]
+    ret = [d.apply(lambda s:pd.to_numeric(s, errors='coerce')) for d in ret]
+
+    if len(ret) == 1:
+        return finlab.dataframe.FinlabDataFrame(ret[0])
+
+    return tuple([finlab.dataframe.FinlabDataFrame(df) for df in ret])
 
 
 if __name__ == "__main__":
