@@ -1,5 +1,6 @@
 from database import Database
 from finlab_data_frame import CustomDataFrame
+from dataframe import FinlabDataFrame
 from format_data import *
 import talib
 import pandas as pd
@@ -8,7 +9,17 @@ import numpy as np
 # Abstract API：
 from talib import abstract
 
+def get_input_args(attr):
+    input_names = attr.input_names
+    refine_input_names = []
+    for key, val in input_names.items():
+        if 'price' in key:
+            if isinstance(val, list):
+                refine_input_names += val
+            elif isinstance(val, str):
+                refine_input_names.append(val)
 
+    return refine_input_names
 class Data:
     def __init__(self):
         """
@@ -120,123 +131,136 @@ class Data:
         else:
             print("目前資料來源有price、report")
 
-def indicator(indname, adjust_price=False, resample='D', market:Union[str, MarketInfo]='TW_STOCK', **kwargs):
-    """支援 Talib 和 pandas_ta 上百種技術指標，計算 2000 檔股票、10年的所有資訊。
 
-    在使用這個函式前，需要安裝計算技術指標的 Packages
 
-    * [Ta-Lib](https://github.com/mrjbq7/ta-lib)
-    * [Pandas-ta](https://github.com/twopirllc/pandas-ta)
 
-    Args:
-        indname (str): 指標名稱，
-            以 TA-Lib 舉例，例如 SMA, STOCH, RSI 等，可以參考 [talib 文件](https://mrjbq7.github.io/ta-lib/doc_index.html)。
 
-            以 Pandas-ta 舉例，例如 supertrend, ssf 等，可以參考 [Pandas-ta 文件](https://twopirllc.github.io/pandas-ta/#indicators-by-category)。
-        adjust_price (bool): 是否使用還原股價計算。
-        resample (str): 技術指標價格週期，ex: `D` 代表日線, `W` 代表週線, `M` 代表月線。
-        market (str): 市場選擇，ex: `TW_STOCK` 代表台股, `US_STOCK` 代表美股。
-        **kwargs (dict): 技術指標的參數設定，TA-Lib 中的 RSI 為例，調整項為計算週期 `timeperiod=14`。
-    建議使用者可以先參考以下範例，並且搭配 talib官方文件，就可以掌握製作技術指標的方法了。
-    """
-    package = None
+    def indicator(self, indname, adjust_price=False, resample='D',  **kwargs):
+        """支援 Talib 和 pandas_ta 上百種技術指標，計算 2000 檔股票、10年的所有資訊。
 
-    try:
-        from talib import abstract
-        import talib
-        attr = getattr(abstract, indname)
-        package = 'talib'
-    except:
+        在使用這個函式前，需要安裝計算技術指標的 Packages
+
+        * [Ta-Lib](https://github.com/mrjbq7/ta-lib)
+        * [Pandas-ta](https://github.com/twopirllc/pandas-ta)
+
+        Args:
+            indname (str): 指標名稱，
+                以 TA-Lib 舉例，例如 SMA, STOCH, RSI 等，可以參考 [talib 文件](https://mrjbq7.github.io/ta-lib/doc_index.html)。
+
+                以 Pandas-ta 舉例，例如 supertrend, ssf 等，可以參考 [Pandas-ta 文件](https://twopirllc.github.io/pandas-ta/#indicators-by-category)。
+            adjust_price (bool): 是否使用還原股價計算。
+            resample (str): 技術指標價格週期，ex: `D` 代表日線, `W` 代表週線, `M` 代表月線。
+            market (str): 市場選擇，ex: `TW_STOCK` 代表台股, `US_STOCK` 代表美股。
+            **kwargs (dict): 技術指標的參數設定，TA-Lib 中的 RSI 為例，調整項為計算週期 `timeperiod=14`。
+        建議使用者可以先參考以下範例，並且搭配 talib官方文件，就可以掌握製作技術指標的方法了。
+        """
+        package = None
+
         try:
-            import pandas_ta
-            # test df.ta has attribute
-            getattr(pd.DataFrame().ta, indname)
-            attr = lambda df, **kwargs: getattr(df.ta, indname)(**kwargs)
-            package = 'pandas_ta'
+            from talib import abstract
+            import talib
+            attr = getattr(abstract, indname)
+            package = 'talib'
         except:
-            raise Exception(
-                "Please install TA-Lib or pandas_ta to get indicators.")
+            try:
+                import pandas_ta
+                # test df.ta has attribute
+                getattr(pd.DataFrame().ta, indname)
+                attr = lambda df, **kwargs: getattr(df.ta, indname)(**kwargs)
+                package = 'pandas_ta'
+            except:
+                raise Exception(
+                    "Please install TA-Lib or pandas_ta to get indicators.")
 
 
-    market = get_market_info(user_market_info=market)
+        # market = get_market_info(user_market_info=market)
 
-    close = market.get_price('close', adj=adjust_price)
-    open_ = market.get_price('open', adj=adjust_price)
-    high = market.get_price('high', adj=adjust_price)
-    low = market.get_price('low', adj=adjust_price)
-    volume = market.get_price('volume', adj=adjust_price)
+        # close = market.get_price('close', adj=adjust_price)
+        # open_ = market.get_price('open', adj=adjust_price)
+        # high = market.get_price('high', adj=adjust_price)
+        # low = market.get_price('low', adj=adjust_price)
+        # volume = market.get_price('volume', adj=adjust_price)
 
-    if resample.upper() != 'D':
-        close = close.resample(resample).last()
-        open_ = open_.resample(resample).first()
-        high = high.resample(resample).max()
-        low = low.resample(resample).min()
-        volume = volume.resample(resample).sum()
+        close =  self.get('price:close')
+        open_ =  self.get('price:open')
+        high =  self.get('price:high')
+        low =  self.get('price:low')
+        volume =  self.get('price:volume')
 
-    dfs = {}
-    default_output_columns = None
-    for key in close.columns:
+        if resample.upper() != 'D':
+            close = close.resample(resample).last()
+            open_ = open_.resample(resample).first()
+            high = high.resample(resample).max()
+            low = low.resample(resample).min()
+            volume = volume.resample(resample).sum()
 
-        prices = {'open': open_[key].ffill(),
-                  'high': high[key].ffill(),
-                  'low': low[key].ffill(),
-                  'close': close[key].ffill(),
-                  'volume': volume[key].ffill()}
+        dfs = {}
+        default_output_columns = None
+        for key in close.columns:
 
-        if package == 'pandas_ta':
-            prices = pd.DataFrame(prices)
-            s = attr(prices, **kwargs)
+            prices = {'open': open_[key].ffill(),
+                    'high': high[key].ffill(),
+                    'low': low[key].ffill(),
+                    'close': close[key].ffill(),
+                    'volume': volume[key].ffill()}
 
-        elif package == 'talib':
-            abstract_input = list(attr.input_names.values())[0]
-            abstract_input = get_input_args(attr)
+            if package == 'pandas_ta':
+                prices = pd.DataFrame(prices)
+                s = attr(prices, **kwargs)
 
-            # quick fix talib bug
-            if indname == 'OBV':
-                abstract_input = ['close', 'volume']
+            elif package == 'talib':
+                abstract_input = list(attr.input_names.values())[0]
+                abstract_input = get_input_args(attr)
 
-            if indname == 'BETA':
-                abstract_input = ['high', 'low']
+                # quick fix talib bug
+                if indname == 'OBV':
+                    abstract_input = ['close', 'volume']
 
-            if isinstance(abstract_input, str):
-                abstract_input = [abstract_input]
-            paras = [prices[k] for k in abstract_input]
-            s = attr(*paras, **kwargs)
-        else:
-            raise Exception("Cannot determine technical package from indname")
+                if indname == 'BETA':
+                    abstract_input = ['high', 'low']
 
-        if isinstance(s, list):
-            s = {i: series for i, series in enumerate(s)}
+                if isinstance(abstract_input, str):
+                    abstract_input = [abstract_input]
+                paras = [prices[k] for k in abstract_input]
+                s = attr(*paras, **kwargs)
+            else:
+                raise Exception("Cannot determine technical package from indname")
 
-        if isinstance(s, np.ndarray):
-            s = {0: s}
+            if isinstance(s, list):
+                s = {i: series for i, series in enumerate(s)}
 
-        if isinstance(s, pd.Series):
-            s = {0: s.values}
+            if isinstance(s, np.ndarray):
+                s = {0: s}
 
-        if isinstance(s, pd.DataFrame):
-            s = {i: series.values for i, series in s.items()}
+            if isinstance(s, pd.Series):
+                s = {0: s.values}
 
-        if default_output_columns is None:
-            default_output_columns = list(s.keys())
+            if isinstance(s, pd.DataFrame):
+                s = {i: series.values for i, series in s.items()}
 
-        for colname, series in s.items():
-            if colname not in dfs:
-                dfs[colname] = {}
-            dfs[colname][key] = series if isinstance(
-                series, pd.Series) else series
+            if default_output_columns is None:
+                default_output_columns = list(s.keys())
 
-    newdic = {}
-    for key, df in dfs.items():
-        newdic[key] = pd.DataFrame(df, index=close.index)
+            for colname, series in s.items():
+                if colname not in dfs:
+                    dfs[colname] = {}
+                dfs[colname][key] = series if isinstance(
+                    series, pd.Series) else series
 
-    ret = [newdic[n] for n in default_output_columns]
-    ret = [d.apply(lambda s:pd.to_numeric(s, errors='coerce')) for d in ret]
+        newdic = {}
+        for key, df in dfs.items():
+            newdic[key] = pd.DataFrame(df, index=close.index)
 
-    if len(ret) == 1:
-        return finlab.dataframe.FinlabDataFrame(ret[0])
+        ret = [newdic[n] for n in default_output_columns]
+        ret = [d.apply(lambda s:pd.to_numeric(s, errors='coerce')) for d in ret]
 
-    return tuple([finlab.dataframe.FinlabDataFrame(df) for df in ret])
+        if len(ret) == 1:
+            return FinlabDataFrame(ret[0])
+
+        return tuple([FinlabDataFrame(df) for df in ret])
+
+
+
 
 
 if __name__ == "__main__":
