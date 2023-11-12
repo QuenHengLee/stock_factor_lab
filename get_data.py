@@ -160,6 +160,7 @@ class Data:
             from talib import abstract
             import talib
             attr = getattr(abstract, indname)
+            print("計算指標:", attr)
             package = 'talib'
         except:
             try:
@@ -197,7 +198,7 @@ class Data:
         dfs = {}
         default_output_columns = None
         for key in close.columns:
-
+            # 組成單一公司的開高低收量
             prices = {'open': open_[key].ffill(),
                     'high': high[key].ffill(),
                     'low': low[key].ffill(),
@@ -209,6 +210,8 @@ class Data:
                 s = attr(prices, **kwargs)
 
             elif package == 'talib':
+                # abstract_input 存放該指標需要開/高/低/收哪幾項
+                # 以idname='AD'為例，abstract_input = ['high', 'low', 'close', 'volume']
                 abstract_input = list(attr.input_names.values())[0]
                 abstract_input = get_input_args(attr)
 
@@ -221,34 +224,65 @@ class Data:
 
                 if isinstance(abstract_input, str):
                     abstract_input = [abstract_input]
+                # paras 存放實際股價資料的list['close','high']
                 paras = [prices[k] for k in abstract_input]
+
+                # 實際呼叫talib計算的地方
+                # attr屬於一種talib._ta_lib.Function
+                # 固可以在後面加(參數)呼叫該方法
+                # 一個s表示一間公司
+                # type(s): dict/ndarray
                 s = attr(*paras, **kwargs)
+
+                 
             else:
                 raise Exception("Cannot determine technical package from indname")
 
+
+            print("s Befor:" ,type(s))
+
+            # 根據回傳的資料格式，搭配不同的處理方法
+            # 最後要統一格式成dict
+            # talib指標回傳一個值屬於nparray,多個值屬於list
             if isinstance(s, list):
+                # 例如: BBANDS、MACD、STOCH
+                # print("result of cal is: list")
                 s = {i: series for i, series in enumerate(s)}
 
             if isinstance(s, np.ndarray):
+                # 例如: ADX、RSI、MA5
+                # print("result of cal is: ndarray")
+                # 將np.ndarrat轉成dict
                 s = {0: s}
 
             if isinstance(s, pd.Series):
+                # print("result of cal is: Series")
                 s = {0: s.values}
 
             if isinstance(s, pd.DataFrame):
+                # print("result of cal is: DataFrame")
                 s = {i: series.values for i, series in s.items()}
+
+            print("s After:" ,type(s))
 
             if default_output_columns is None:
                 default_output_columns = list(s.keys())
 
+            # dfs是一個dict結構，以BBANDS為例
+            # 迴圈會每次逐行加上公司column
+            # dfs[0]存放所有公司的upper
+            # dfs[1]存放所有公司的middle
             for colname, series in s.items():
                 if colname not in dfs:
                     dfs[colname] = {}
                 dfs[colname][key] = series if isinstance(
                     series, pd.Series) else series
+                
+            # print("dfs:", dfs)
 
         newdic = {}
         for key, df in dfs.items():
+            # 原本的計算結果都存放在dict中，最後在一次轉換成dataframe
             newdic[key] = pd.DataFrame(df, index=close.index)
 
         ret = [newdic[n] for n in default_output_columns]
@@ -281,8 +315,36 @@ if __name__ == "__main__":
     # all_companys = get_all_company_symbol(data.raw_price_data)
     # print(all_companys)
 
-    a = adx = data.indicator("ADX")
+    a = adx = data.indicator("MACD")
     a
 
-    b = adx = data.indicator("ADX", timeperiod=50)
-    b
+    # b = adx = data.indicator("ADX", timeperiod=50)
+    # b
+
+    # talib 所有的指標
+    technical_indicators = [
+    'ACOS', 'AD', 'ADD', 'ADOSC', 'ADX', 'ADXR', 'APO', 'AROON', 'AROONOSC',
+    'ASIN', 'ATAN', 'ATR', 'AVGPRICE', 'BBANDS', 'BETA', 'BOP', 'CCI',
+    'CDLABANDONEDBABY', 'CDLADVANCEBLOCK', 'CDLBELTHOLD', 'CDLBREAKAWAY',
+    'CDLCLOSINGMARUBOZU', 'CDLCONCEALBABYSWALL', 'CDLCOUNTERATTACK',
+    'CDLDARKCLOUDCOVER', 'CDLDOJI', 'CDLDOJISTAR', 'CDLDRAGONFLYDOJI',
+    'CDLENGULFING', 'CDLEVENINGDOJISTAR', 'CDLEVENINGSTAR', 'CDLGAPSIDESIDEWHITE',
+    'CDLGRAVESTONEDOJI', 'CDLHAMMER', 'CDLHANGINGMAN', 'CDLHARAMI', 'CDLHARAMICROSS',
+    'CDLHIGHWAVE', 'CDLHIKKAKE', 'CDLHIKKAKEMOD', 'CDLHOMINGPIGEON', 'CDLINNECK',
+    'CDLINVERTEDHAMMER', 'CDLKICKING', 'CDLKICKINGBYLENGTH', 'CDLLADDERBOTTOM',
+    'CDLLONGLEGGEDDOJI', 'CDLLONGLINE', 'CDLMARUBOZU', 'CDLMATCHINGLOW',
+    'CDLMATHOLD', 'CDLMORNINGDOJISTAR', 'CDLMORNINGSTAR', 'CDLONNECK', 'CDLPIERCING',
+    'CDLRICKSHAWMAN', 'CDLSEPARATINGLINES', 'CDLSHOOTINGSTAR', 'CDLSHORTLINE',
+    'CDLSPINNINGTOP', 'CDLSTALLEDPATTERN', 'CDLSTICKSANDWICH', 'CDLTAKURI',
+    'CDLTASUKIGAP', 'CDLTHRUSTING', 'CDLTRISTAR', 'CEIL', 'CMO', 'CORREL', 'COS',
+    'COSH', 'DEMA', 'DIV', 'DX', 'EMA', 'EXP', 'FLOOR', 'KAMA', 'LINEARREG', 'LN',
+    'MA', 'MACD', 'MACDEXT', 'MACDFIX', 'MAMA', 'MAVP', 'MAX', 'MAXINDEX',
+    'MEDPRICE', 'MFI', 'MIDPOINT', 'MIDPRICE', 'MIN', 'MININDEX', 'MINMAX',
+    'MINMAXINDEX', 'MOM', 'MULT', 'NATR', 'OBV', 'PPO', 'ROC', 'ROCP', 'ROCR',
+    'RSI', 'SAR', 'SAREXT', 'SIN', 'SINH', 'SMA', 'SQRT', 'STDDEV', 'STOCH',
+    'STOCHF', 'STOCHRSI', 'SUB', 'SUM', 'TAN', 'TANH', 'TEMA', 'TRANGE', 'TRIMA',
+    'TRIX', 'TSF', 'TYPPRICE', 'ULTOSC', 'VAR', 'WCLPRICE', 'WILLR', 'WMA'
+    ]   
+
+    # # 打印列表
+    # print(technical_indicators)
