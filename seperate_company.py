@@ -65,7 +65,7 @@ class SeperateCompany:
 
     def get_quantile_factor(self, factor_df, N=4):
         """
-        INPUT: self, 存放單一因子指標的Datafram, 切割成N等分
+        INPUT: self, 存放單一因子指標的Dataframe, 切割成N等分
         OUTPUT: N個DF 每個代表當天每N分位的公司(Quantile 1 的因子值最大)
         FUNCTION: 把所有公司切成N等分
         """
@@ -88,16 +88,17 @@ class SeperateCompany:
             df.columns = factor_df.columns
             df.index = factor_df.index
 
-        # 將不同分位的DataFrame存儲在一個字典中，方便根據需要訪問
-        quantile_dict = {f"Quantile {i+1}": df for i, df in enumerate(quantile_dfs)}
+        # 使用tuple來存放不同分位的DataFrame
+        quantile_tuple = tuple((f"Quantile {i+1}", df) for i, df in enumerate(quantile_dfs))
 
         # 輸出不同分位的DataFrame
-        # for quantile_name, quantile_df in quantile_dict.items():
+        # for quantile_name, quantile_df in quantile_tuple:
         #     print(f"{quantile_name}:")
         #     print(quantile_df)
         #     print()
 
-        return quantile_dict
+        return quantile_tuple
+
 
 
 if __name__ == "__main__":
@@ -105,4 +106,4 @@ if __name__ == "__main__":
     data = Data()
     factor_df = data.get("report:roe")
     factor_df['ROE']
-    a = SeperateCompany.get_quantile_factor(factor_df['ROE'])
+    a ,b,c,d= SeperateCompany.get_quantile_factor(factor_df['ROE'])
