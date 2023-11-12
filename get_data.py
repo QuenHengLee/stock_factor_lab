@@ -116,18 +116,24 @@ class Data:
         elif subject == "report":
             # 財報資料的Header為大寫
             item = item.upper().replace(" ", "")
-            # 可能會有多個財報資料，以逗號加空格為分隔符
-            # 將字串以逗號加空格為分隔符，分割成元素列表
-            elements = item.split(",")
-            # 創建一個以元素為鍵，空字串為值的字典
-            element_dict = {element: "" for element in elements}
-            # 使用迴圈遍歷字典的鍵值對
-            for key, value in element_dict.items():
-                # 呼叫處理財報的FUNCT
-                element_dict[key] = self.format_report_data(key)
+            report_data = self.format_report_data(item)
+            return report_data
+        
+        # elif subject == "report":
+        #     # 財報資料的Header為大寫
+        #     item = item.upper().replace(" ", "")
+        #     # 可能會有多個財報資料，以逗號加空格為分隔符
+        #     # 將字串以逗號加空格為分隔符，分割成元素列表
+        #     elements = item.split(",")
+        #     # 創建一個以元素為鍵，空字串為值的字典
+        #     element_dict = {element: "" for element in elements}
+        #     # 使用迴圈遍歷字典的鍵值對
+        #     for key, value in element_dict.items():
+        #         # 呼叫處理財報的FUNCT
+        #         element_dict[key] = self.format_report_data(key)
 
-            # 有多個財報資料時，回傳一個字典
-            return element_dict
+        #     # 有多個財報資料時，回傳一個字典
+        #     return element_dict
         else:
             print("目前資料來源有price、report")
 
@@ -160,7 +166,7 @@ class Data:
             from talib import abstract
             import talib
             attr = getattr(abstract, indname)
-            print("計算指標:", attr)
+            # print("計算指標:", attr)
             package = 'talib'
         except:
             try:
@@ -239,8 +245,6 @@ class Data:
                 raise Exception("Cannot determine technical package from indname")
 
 
-            print("s Befor:" ,type(s))
-
             # 根據回傳的資料格式，搭配不同的處理方法
             # 最後要統一格式成dict
             # talib指標回傳一個值屬於nparray,多個值屬於list
@@ -263,7 +267,6 @@ class Data:
                 # print("result of cal is: DataFrame")
                 s = {i: series.values for i, series in s.items()}
 
-            print("s After:" ,type(s))
 
             if default_output_columns is None:
                 default_output_columns = list(s.keys())
