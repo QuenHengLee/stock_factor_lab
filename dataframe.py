@@ -82,16 +82,16 @@ def get_index_str_frequency(df):
 
 
 @reshape_operations
-class FinlabDataFrame(pd.DataFrame):
+class CustomDataFrame(pd.DataFrame):
     """回測語法糖
     除了使用熟悉的 Pandas 語法外，我們也提供很多語法糖，讓大家開發程式時，可以用簡易的語法完成複雜的功能，讓開發策略更簡潔！
-    我們將所有的語法糖包裹在 `FinlabDataFrame` 中，用起來跟 `pd.DataFrame` 一樣，但是多了很多功能！
-    只要使用 `finlab.data.get()` 所獲得的資料，皆為 `FinlabDataFrame` 格式，
-    接下來我們就來看看， `FinlabDataFrame` 有哪些好用的語法糖吧！
+    我們將所有的語法糖包裹在 `CustomDataFrame` 中，用起來跟 `pd.DataFrame` 一樣，但是多了很多功能！
+    只要使用 `finlab.data.get()` 所獲得的資料，皆為 `CustomDataFrame` 格式，
+    接下來我們就來看看， `CustomDataFrame` 有哪些好用的語法糖吧！
 
     當資料日期沒有對齊（例如: 財報 vs 收盤價 vs 月報）時，在使用以下運算符號：
     `+`, `-`, `*`, `/`, `>`, `>=`, `==`, `<`, `<=`, `&`, `|`, `~`，
-    不需要先將資料對齊，因為 `FinlabDataFrame` 會自動幫你處理，以下是示意圖。
+    不需要先將資料對齊，因為 `CustomDataFrame` 會自動幫你處理，以下是示意圖。
 
     <img src="https://i.ibb.co/pQr5yx5/Screen-Shot-2021-10-26-at-5-32-44-AM.png" alt="steps">
 
@@ -99,7 +99,7 @@ class FinlabDataFrame(pd.DataFrame):
 
     ```py
     from finlab import data
-    # 取得 FinlabDataFrame
+    # 取得 CustomDataFrame
     close = data.get('price:收盤價')
     roa = data.get('fundamental_features:ROA稅後息前')
 
@@ -109,11 +109,11 @@ class FinlabDataFrame(pd.DataFrame):
     cond_1_2 = cond1 & cond2
     ```
     擷取 1101 台泥 的訊號如下圖，可以看到 `cond1` 跟 `cond2` 訊號的頻率雖然不相同，
-    但是由於 `cond1` 跟 `cond2` 是 `FinlabDataFrame`，所以可以直接取交集，而不用處理資料頻率對齊的問題。
+    但是由於 `cond1` 跟 `cond2` 是 `CustomDataFrame`，所以可以直接取交集，而不用處理資料頻率對齊的問題。
     <br />
     <img src="https://i.ibb.co/m9chXSQ/imageconds.png" alt="imageconds">
 
-    總結來說，FinlabDataFrame 與一般 dataframe 唯二不同之處：
+    總結來說，CustomDataFrame 與一般 dataframe 唯二不同之處：
     1. 多了一些 method，如`df.is_largest()`, `df.sustain()`...等。
     2. 在做四則運算、不等式運算前，會將 df1、df2 的 index 取聯集，column 取交集。
     """
@@ -125,7 +125,7 @@ class FinlabDataFrame(pd.DataFrame):
 
     @property
     def _constructor(self):        
-        return FinlabDataFrame
+        return CustomDataFrame
 
     @staticmethod
     def reshape(df1, df2):
@@ -137,7 +137,7 @@ class FinlabDataFrame(pd.DataFrame):
         d2_index_freq = get_index_str_frequency(df2) if isdf2 else None
 
         if isinstance(df2, pd.Series):
-            df2 = FinlabDataFrame({c: df2 for c in df1.columns})
+            df2 = CustomDataFrame({c: df2 for c in df1.columns})
             if d2_index_freq:
                 # tell user has high chance to use future data
                 logger.warning('Detect pd.Series has season/month index, the chance of using future data is high!\n'
@@ -148,8 +148,8 @@ class FinlabDataFrame(pd.DataFrame):
         if ((d1_index_freq or d2_index_freq)
             and (d1_index_freq != d2_index_freq)) and isdf1 and isdf2:
 
-            df1 = df1.index_str_to_date() if isinstance(df1, FinlabDataFrame) else df1
-            df2 = df2.index_str_to_date() if isinstance(df2, FinlabDataFrame) else df2
+            df1 = df1.index_str_to_date() if isinstance(df1, CustomDataFrame) else df1
+            df2 = df2.index_str_to_date() if isinstance(df2, CustomDataFrame) else df2
 
         if (isdf1 and isdf2 and len(df1) and len(df2)
             and isinstance(df1.index[0], pd.Timestamp) 
@@ -229,7 +229,7 @@ class FinlabDataFrame(pd.DataFrame):
             return self
 
         index = (self.index - datetime.timedelta(days=30)).strftime('%Y-M%m')
-        df = FinlabDataFrame(self.values, index=index, columns=self.columns)
+        df = CustomDataFrame(self.values, index=index, columns=self.columns)
 
         return df
 
@@ -246,13 +246,13 @@ class FinlabDataFrame(pd.DataFrame):
             rev = data.get('monthly_revenue:當月營收', force_download=True)
 
         if not (self.index.str.find('M') != -1).all():
-          logger.warning('FinlabDataFrame: invalid index, cannot format index to monthly timestamp.')
+          logger.warning('CustomDataFrame: invalid index, cannot format index to monthly timestamp.')
           return self
 
         index = monthly_index
         index = self.to_business_day(index)
 
-        ret = FinlabDataFrame(self.values, index=index, columns=self.columns)
+        ret = CustomDataFrame(self.values, index=index, columns=self.columns)
         ret.index.name = 'date'
  
         return ret
@@ -260,7 +260,7 @@ class FinlabDataFrame(pd.DataFrame):
     def _index_to_business_day(self):
 
         index = self.to_business_day(self.index)
-        ret = FinlabDataFrame(self.values, index=index, columns=self.columns)
+        ret = CustomDataFrame(self.values, index=index, columns=self.columns)
         ret.index.name = 'date'
         return ret
     
@@ -277,7 +277,7 @@ class FinlabDataFrame(pd.DataFrame):
           q = self.index.strftime('%m').astype(int).map({5:1, 8:2, 9:2, 10:3, 11:3, 3:4, 4:4})
           year -= (q == 4)
         index = year.astype(str) + f'{postfix}-Q' + q.astype(str)
-        return FinlabDataFrame(self.values, index=index, columns=self.columns)
+        return CustomDataFrame(self.values, index=index, columns=self.columns)
 
     def deadline(self):
         """財務索引轉換成公告截止日
@@ -340,7 +340,7 @@ class FinlabDataFrame(pd.DataFrame):
         .drop_duplicates(['disclosures', col_name])
         .pivot(index='disclosures', columns=col_name, values='value').ffill()
         .pipe(lambda df: df.loc[df.index.notna()])
-        .pipe(lambda df: FinlabDataFrame(df))
+        .pipe(lambda df: CustomDataFrame(df))
         .rename_axis('date')
       )
 
@@ -776,4 +776,39 @@ class FinlabDataFrame(pd.DataFrame):
                             price=price.values,
                             ranking=rank_reindex.values)
         return pd.DataFrame(ret, index=entry.index, columns=entry.columns).astype(bool)
+    
+    def divide_slice(self, quantile=4):
+        """
+        INPUT: self, 存放單一因子指標的Dataframe, 切割成N等分
+        OUTPUT: N個DF 每個代表當天每N分位的公司(Quantile 1 的因子值最大)，回傳tuple
+        FUNCTION: 把所有公司切成N等分
+        """
+
+        # 計算每個日期的ROE排名
+        rank_df = self.rank(ascending=False, axis=1)
+
+        # # 計算每個日期的分位數（根據公司數量和N來定義）
+        # num_companies = len(self.columns)
+        # 計算每個日期非NaN的公司數量
+        num_companies = (~pd.isna(self)).sum(axis=1)
+
+        interval = num_companies // quantile
+
+        # 創建N個DataFrame，用於存放不同分位的公司
+        quantile_dfs = [
+            ((rank_df > i * interval) & (rank_df <= (i + 1) * interval))
+            for i in range(quantile)
+        ]
+
+        # 保持索引和列的一致性
+        for df in quantile_dfs:
+            df.columns = self.columns
+            df.index = self.index
+
+        # 使用tuple來存放不同分位的DataFrame
+        quantile_tuple = tuple(df for df in quantile_dfs)
+
+
+        return quantile_tuple
+       
 
