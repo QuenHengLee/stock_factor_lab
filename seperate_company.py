@@ -3,6 +3,7 @@ from database import Database
 from backtest import Backtest
 from datetime import datetime
 import pandas as pd
+from finlab_data_frame import CustomDataFrame
 
 
 class SeperateCompany:
@@ -11,39 +12,6 @@ class SeperateCompany:
         # 與資料庫連線
         # 下載全部資料(from database)
         pass
-
-    """
-    INPUT: self, 存放單一因子指標的Datafram, 前N大的公司, 大/小
-    OUTPUT: 一個內容為T/F的Dataframe
-    FUNCTION: 利用特定切割所有公司(找出前n大)
-    """
-
-    def get_ranked_factor(self, factor_df, top_n=10, order="large"):
-        # factor_df = self.format_report_data(factor)
-        # 初始化一个新的DataFrame，全部设为False
-        factor_top_n = pd.DataFrame(
-            False, index=factor_df.index, columns=factor_df.columns
-        )
-
-        # 对于每个季度，选择factor最高的前10个公司并标记为True
-        for quarter in factor_df.index:
-            # 計算當天factor值不為nan的公司數量
-            factor_values = factor_df.loc[quarter]
-            num_companies_with_values = factor_values.count()
-            # 如果當天factor不為nan的公司數<top_n --> 全部為false
-            if num_companies_with_values < top_n:
-                factor_top_n.loc[quarter, :] = False
-            else:
-                # 判斷要找前N大/小
-                if order == "large":
-                    top_n_companies = factor_df.loc[quarter].nlargest(top_n).index
-                elif order == "small":
-                    top_n_companies = factor_df.loc[quarter].nsmallest(top_n).index
-                factor_top_n.loc[quarter, top_n_companies] = True
-
-        # print(f"Top {top_n} companies ")
-        # print(factor_top_n)
-        return factor_top_n
 
     def backtest_all_quantile(
         self,
@@ -93,15 +61,14 @@ class SeperateCompany:
         # 返回包含不同分位数数据的字典
         return all_result_dict
 
-    """
-    INPUT: self, 存放單一因子指標的Datafram, 切割成N等分
-    OUTPUT: N個DF 每個代表當天每N分位的公司(Quantile 1 的因子值最大)
-    FUNCTION: 把所有公司切成N等分
-    """
+
 
     def get_quantile_factor(self, factor_df, N=4):
-        # 動態指定分位數的數量
-        # N = 4  # 這裡可以設置任意你想要的分位數數量
+        """
+        INPUT: self, 存放單一因子指標的Datafram, 切割成N等分
+        OUTPUT: N個DF 每個代表當天每N分位的公司(Quantile 1 的因子值最大)
+        FUNCTION: 把所有公司切成N等分
+        """
 
         # 計算每個日期的ROE排名
         rank_df = factor_df.rank(ascending=False, axis=1)
@@ -137,4 +104,5 @@ if __name__ == "__main__":
     SeperateCompany = SeperateCompany()
     data = Data()
     factor_df = data.get("report:roe")
-    SeperateCompany.get_ranked_factor(factor_df)
+    factor_df['ROE']
+    a = SeperateCompany.get_quantile_factor(factor_df['ROE'])
