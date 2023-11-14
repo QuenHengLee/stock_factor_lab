@@ -188,6 +188,55 @@ class Backtest():
 
         return np.power(self.stock_data.iloc[-1]['cum_returns'], num_years)-1
 
+    def calc_monthly_return(self):
+        '''
+        monthly_return : 月報酬
+        公式 : 本月投資組合價值/上個月的投資組合價值
+        可以用pct_change()
+        最後利用樞紐整理成dataframe
+        
+        return:
+            dataframe : index:年分、columns:月份
+        '''
+        # 先copy一份原始資料
+        stock_data = pd.DataFrame(self.stock_data['portfolio_value'].resample('M').last())
+        stock_data['monthly_returns'] = stock_data['portfolio_value'].pct_change()
+
+        #  columns : 'year' 和 'month' 
+        stock_data['year'] = stock_data.index.year
+        stock_data['month'] = stock_data.index.strftime('%b')  # 將月份轉換為縮寫形式
+
+        return round(sort_month(stock_data.pivot_table(index='year', columns='month', values='monthly_returns').replace([np.inf, -np.inf, np.nan], 0))*100, 1)
+    
+    def calc_yearly_return(self):
+        '''
+        yearly_return : 年回報
+        公式 : 今年投資組合價值/去年的投資組合價值
+        可以用pct_change()，但因第一年會有沒有值的情況，
+        因此先計算【日回報】，再利用(1+r1)*(1+r2)*...*(1+rn)-1來計算每年回報
+
+        return:
+            dataframe: columns:年分
+        '''
+        # 先前已經計算過日回報
+        daily_returns = pd.DataFrame(self.stock_data['portfolio_returns'])
+
+        # 使用 resample 計算每年的年報酬
+        annual_returns = daily_returns.resample('A').apply(lambda x: (1 + x).prod() - 1)
+        annual_returns = annual_returns[annual_returns['portfolio_returns']!=0]
+
+        # 將index改為年分
+        annual_returns.index = annual_returns.index.year
+
+        return round(annual_returns.T * 100, 1)
+
+
+
 # 用來安全進行除法的函數。如果分母 d 不等於零，則返回 n / d，否則返回 0。
 def safe_division(n, d):
     return n / d if d else 0
+
+# 用來將dataframe按照月份排列
+def sort_month(df):
+    month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    return df[month_order]
