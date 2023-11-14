@@ -3,7 +3,7 @@ from database import Database
 from backtest import Backtest
 from datetime import datetime
 import pandas as pd
-from finlab_data_frame import CustomDataFrame
+from dataframe import CustomDataFrame
 
 
 class SeperateCompany:

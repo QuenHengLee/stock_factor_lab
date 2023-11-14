@@ -2,7 +2,7 @@
 # 這些function是將原始DB TABLE的資料轉成get() api可用格式
 
 import pandas as pd
-from finlab_data_frame import CustomDataFrame 
+from dataframe import CustomDataFrame 
 
 # Abstract API：
 from talib import abstract

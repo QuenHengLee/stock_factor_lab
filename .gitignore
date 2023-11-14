@@ -6,6 +6,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 
 # C extensions
 *.so
@@ -216,9 +217,20 @@ Backup of *.doc*
 
 # output plot files
 *.html
+/OutputFile
 
 # template from finlab doc files
 /OfficialPage
 
+# test file
+/tests
+
+# trash can
+/UselessFile
 
 
+
+
+__pycache__/database.cpython-38.pyc
+__pycache__/Backtest.cpython-38.pyc
+__pycache__/get_data.cpython-38.pyc

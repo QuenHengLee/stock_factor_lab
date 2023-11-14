@@ -1,6 +1,6 @@
 from database import Database
-from finlab_data_frame import CustomDataFrame
-from dataframe import FinlabDataFrame
+from dataframe import CustomDataFrame
+from dataframe import CustomDataFrame
 from format_data import *
 import talib
 import pandas as pd
@@ -292,9 +292,9 @@ class Data:
         ret = [d.apply(lambda s:pd.to_numeric(s, errors='coerce')) for d in ret]
 
         if len(ret) == 1:
-            return FinlabDataFrame(ret[0])
+            return CustomDataFrame(ret[0])
 
-        return tuple([FinlabDataFrame(df) for df in ret])
+        return tuple([CustomDataFrame(df) for df in ret])
 
 
 
