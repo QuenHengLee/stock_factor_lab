@@ -1,31 +1,104 @@
 from database import Database
-# import talib
+from dataframe import CustomDataFrame
+from dataframe import CustomDataFrame
+from format_data import *
+import talib
 import pandas as pd
 import numpy as np
 
 # Abstract API：
-# from talib import abstract
+from talib import abstract
 
+def get_input_args(attr):
+    input_names = attr.input_names
+    refine_input_names = []
+    for key, val in input_names.items():
+        if 'price' in key:
+            if isinstance(val, list):
+                refine_input_names += val
+            elif isinstance(val, str):
+                refine_input_names.append(val)
 
+    return refine_input_names
 class Data:
-    # 物件初始化: 接收SQL下來DB的資料
     def __init__(self):
-        # 與資料庫連線 & 下載全部資料(from database)
+        """
+        初始化物件，連接資料庫並下載相關資料。
+
+        Args:
+            self: 類的實例（通常是類的物件，不需要額外指定）。
+        """
+        # 連接資料庫並下載股價資料
         self.db = Database()
-        # 初始化stock price 資料
         self.raw_price_data = self.db.get_daily_stock()
         self.all_price_dict = self.handle_price_data()
-        # 初始化stock price 資料
+        # 下載財報資料
         self.raw_report_data = self.db.get_finance_report()
 
-    """
-    INPUT: self, dataset(str)帶入想要的資料名稱Ex. price:close、report:roe
-    OUTPUT: 一個內容為所有公司股價/財報相關資料的Dataframe
-    FUNCTION: 從DB中取得資料
-    """
+    def format_price_data(self, item):
+        """
+        從原始股價資料中處理特定項目的資料。
+
+        Args:
+            item (str): 要處理的項目名稱。
+
+        Returns:
+            pandas.DataFrame: 處理後的股價資料的DataFrame。
+        """
+        return format_price_data(self.raw_price_data, item)
+
+    def format_report_data(self, factor):
+        """
+        從原始財報資料中處理特定因子的資料。
+
+        Args:
+            factor (str): 要處理的財報因子名稱。
+
+        Returns:
+            pandas.DataFrame: 處理後的財報資料的DataFrame。
+        """
+        return format_report_data(self.raw_report_data, factor)
+
+    def handle_price_data(self):
+        """
+        處理原始股價資料並返回一個字典。
+
+        Returns:
+            dict: 包含處理後的股價資料的字典。
+        """
+        return handle_price_data(self.raw_price_data)
 
     # 取得資料起點
     def get(self, dataset):
+        """
+        從資料庫中取得資料並返回相應的DataFrame。
+
+        Args:
+            self: 類的實例（通常是類的物件，不需要額外指定）。
+            dataset (str): 想要的資料名稱，格式如 "price:close" 或 "report:roe"。
+
+        Returns:
+            pandas.DataFrame or dict: 一個包含所有公司股價/財報相關資料的DataFrame 或一個包含多個財報資料的字典。
+
+        註解:
+        - 此方法根據輸入的資料名稱（dataset）擷取相對應的資料。
+        - 如果資料名稱是 "price"，則返回股價相關的DataFrame。
+        - 如果資料名稱是 "report"，則返回多個財報資料的字典，每個財報資料對應一個鍵。
+        - 資料名稱應以冒號分隔，例如 "price:close" 或 "report:roe"。
+        - 如果輸入格式不正確，將列印錯誤訊息。
+
+        使用示例:
+        ```
+        # 創建類的實例
+        my_instance = YourClass()
+        # 呼叫get方法取得股價資料
+        price_data = my_instance.get("price:close")
+        # price_data 可能是一個DataFrame，包含股價相關資料。
+        # 或者呼叫get方法取得多個財報資料
+        report_data = my_instance.get("report:roe,eps")
+        # report_data 是一個字典，包含多個財報資料，例如 {"roe": DataFrame, "eps": DataFrame}。
+        ```
+        """
         # 使用 lower() 方法將字串轉換為小寫
         dataset = dataset.lower()
         # 使用 split() 函數按 ":" 分隔字串
@@ -43,68 +116,188 @@ class Data:
         elif subject == "report":
             # 財報資料的Header為大寫
             item = item.upper().replace(" ", "")
-            # 可能會有多個財報資料，以逗號加空格為分隔符
-            # 將字串以逗號加空格為分隔符，分割成元素列表
-            elements = item.split(",")
-            # 創建一個以元素為鍵，空字串為值的字典
-            element_dict = {element: "" for element in elements}
-            # 使用迴圈遍歷字典的鍵值對
-            for key, value in element_dict.items():
-                # 呼叫處理財報的FUNCT
-                element_dict[key] = self.format_report_data(key)
+            report_data = self.format_report_data(item)
+            return report_data
+        
+        # elif subject == "report":
+        #     # 財報資料的Header為大寫
+        #     item = item.upper().replace(" ", "")
+        #     # 可能會有多個財報資料，以逗號加空格為分隔符
+        #     # 將字串以逗號加空格為分隔符，分割成元素列表
+        #     elements = item.split(",")
+        #     # 創建一個以元素為鍵，空字串為值的字典
+        #     element_dict = {element: "" for element in elements}
+        #     # 使用迴圈遍歷字典的鍵值對
+        #     for key, value in element_dict.items():
+        #         # 呼叫處理財報的FUNCT
+        #         element_dict[key] = self.format_report_data(key)
 
-            # 有多個財報資料時，回傳一個字典
-            return element_dict
+        #     # 有多個財報資料時，回傳一個字典
+        #     return element_dict
         else:
             print("目前資料來源有price、report")
 
-    # 處理stock price的functions
-    def handle_price_data(self):
-        self.all_open = self.format_price_data("open")
-        self.all_high = self.format_price_data("high")
-        self.all_low = self.format_price_data("low")
-        self.all_close = self.format_price_data("close")
-        self.all_volume = self.format_price_data("volume")
-        self.all_market_capital = self.format_price_data("market_capital")
-        # 宣告一個字典存放這些dataframe
-        # 呼叫.indicator時，就是傳入這個dict
-        self.all_price_dict = {
-            "open": self.all_open,
-            "high": self.all_high,
-            "low": self.all_low,
-            "close": self.all_close,
-            "volume": self.all_volume,
-            "market_capital": self.all_market_capital,
-        }
-        return self.all_price_dict
 
-    def format_price_data(self, item):
-        selected_data = self.raw_price_data[["date", item, "company_symbol"]]
-        pivot_data = selected_data.pivot_table(
-            index="date", columns="company_symbol", values=item
-        )
-        return pivot_data
 
-    # 處理stock finace report的functions
-    def format_report_data(self, factor):
-        # 把factor的值取出來
-        unique_ids = self.raw_report_data["factor_name"].unique()
-        # 建立一個dict來存放個個factor
-        dfs_by_id = {}
-        # 根據唯一的factor建立DF
-        for unique_id in unique_ids:
-            temp_df = self.raw_report_data[
-                self.raw_report_data["factor_name"] == unique_id
-            ].pivot(index="date", columns="company_symbol", values="factor_value")
-            dfs_by_id[unique_id] = temp_df
 
-        # 印出每個factor的DF
-        # for unique_id, temp_df in dfs_by_id.items():
-        #     print(f"DataFrame for factor_name {unique_id}:\n{temp_df}\n")
-        # 印出單一factor的DF
-        print(f"DataFrame for factor_name {factor}:\n")
-        # print(dfs_by_id[factor])
-        return dfs_by_id[factor]
+
+    def indicator(self, indname, adjust_price=False, resample='D',  **kwargs):
+        """支援 Talib 和 pandas_ta 上百種技術指標，計算 2000 檔股票、10年的所有資訊。
+
+        在使用這個函式前，需要安裝計算技術指標的 Packages
+
+        * [Ta-Lib](https://github.com/mrjbq7/ta-lib)
+        * [Pandas-ta](https://github.com/twopirllc/pandas-ta)
+
+        Args:
+            indname (str): 指標名稱，
+                以 TA-Lib 舉例，例如 SMA, STOCH, RSI 等，可以參考 [talib 文件](https://mrjbq7.github.io/ta-lib/doc_index.html)。
+
+                以 Pandas-ta 舉例，例如 supertrend, ssf 等，可以參考 [Pandas-ta 文件](https://twopirllc.github.io/pandas-ta/#indicators-by-category)。
+            adjust_price (bool): 是否使用還原股價計算。
+            resample (str): 技術指標價格週期，ex: `D` 代表日線, `W` 代表週線, `M` 代表月線。
+            market (str): 市場選擇，ex: `TW_STOCK` 代表台股, `US_STOCK` 代表美股。
+            **kwargs (dict): 技術指標的參數設定，TA-Lib 中的 RSI 為例，調整項為計算週期 `timeperiod=14`。
+        建議使用者可以先參考以下範例，並且搭配 talib官方文件，就可以掌握製作技術指標的方法了。
+        """
+        package = None
+
+        try:
+            from talib import abstract
+            import talib
+            attr = getattr(abstract, indname)
+            # print("計算指標:", attr)
+            package = 'talib'
+        except:
+            try:
+                import pandas_ta
+                # test df.ta has attribute
+                getattr(pd.DataFrame().ta, indname)
+                attr = lambda df, **kwargs: getattr(df.ta, indname)(**kwargs)
+                package = 'pandas_ta'
+            except:
+                raise Exception(
+                    "Please install TA-Lib or pandas_ta to get indicators.")
+
+
+        # market = get_market_info(user_market_info=market)
+
+        # close = market.get_price('close', adj=adjust_price)
+        # open_ = market.get_price('open', adj=adjust_price)
+        # high = market.get_price('high', adj=adjust_price)
+        # low = market.get_price('low', adj=adjust_price)
+        # volume = market.get_price('volume', adj=adjust_price)
+
+        close =  self.get('price:close')
+        open_ =  self.get('price:open')
+        high =  self.get('price:high')
+        low =  self.get('price:low')
+        volume =  self.get('price:volume')
+
+        if resample.upper() != 'D':
+            close = close.resample(resample).last()
+            open_ = open_.resample(resample).first()
+            high = high.resample(resample).max()
+            low = low.resample(resample).min()
+            volume = volume.resample(resample).sum()
+
+        dfs = {}
+        default_output_columns = None
+        for key in close.columns:
+            # 組成單一公司的開高低收量
+            prices = {'open': open_[key].ffill(),
+                    'high': high[key].ffill(),
+                    'low': low[key].ffill(),
+                    'close': close[key].ffill(),
+                    'volume': volume[key].ffill()}
+
+            if package == 'pandas_ta':
+                prices = pd.DataFrame(prices)
+                s = attr(prices, **kwargs)
+
+            elif package == 'talib':
+                # abstract_input 存放該指標需要開/高/低/收哪幾項
+                # 以idname='AD'為例，abstract_input = ['high', 'low', 'close', 'volume']
+                abstract_input = list(attr.input_names.values())[0]
+                abstract_input = get_input_args(attr)
+
+                # quick fix talib bug
+                if indname == 'OBV':
+                    abstract_input = ['close', 'volume']
+
+                if indname == 'BETA':
+                    abstract_input = ['high', 'low']
+
+                if isinstance(abstract_input, str):
+                    abstract_input = [abstract_input]
+                # paras 存放實際股價資料的list['close','high']
+                paras = [prices[k] for k in abstract_input]
+
+                # 實際呼叫talib計算的地方
+                # attr屬於一種talib._ta_lib.Function
+                # 固可以在後面加(參數)呼叫該方法
+                # 一個s表示一間公司
+                # type(s): dict/ndarray
+                s = attr(*paras, **kwargs)
+
+                 
+            else:
+                raise Exception("Cannot determine technical package from indname")
+
+
+            # 根據回傳的資料格式，搭配不同的處理方法
+            # 最後要統一格式成dict
+            # talib指標回傳一個值屬於nparray,多個值屬於list
+            if isinstance(s, list):
+                # 例如: BBANDS、MACD、STOCH
+                # print("result of cal is: list")
+                s = {i: series for i, series in enumerate(s)}
+
+            if isinstance(s, np.ndarray):
+                # 例如: ADX、RSI、MA5
+                # print("result of cal is: ndarray")
+                # 將np.ndarrat轉成dict
+                s = {0: s}
+
+            if isinstance(s, pd.Series):
+                # print("result of cal is: Series")
+                s = {0: s.values}
+
+            if isinstance(s, pd.DataFrame):
+                # print("result of cal is: DataFrame")
+                s = {i: series.values for i, series in s.items()}
+
+
+            if default_output_columns is None:
+                default_output_columns = list(s.keys())
+
+            # dfs是一個dict結構，以BBANDS為例
+            # 迴圈會每次逐行加上公司column
+            # dfs[0]存放所有公司的upper
+            # dfs[1]存放所有公司的middle
+            for colname, series in s.items():
+                if colname not in dfs:
+                    dfs[colname] = {}
+                dfs[colname][key] = series if isinstance(
+                    series, pd.Series) else series
+                
+            # print("dfs:", dfs)
+
+        newdic = {}
+        for key, df in dfs.items():
+            # 原本的計算結果都存放在dict中，最後在一次轉換成dataframe
+            newdic[key] = pd.DataFrame(df, index=close.index)
+
+        ret = [newdic[n] for n in default_output_columns]
+        ret = [d.apply(lambda s:pd.to_numeric(s, errors='coerce')) for d in ret]
+
+        if len(ret) == 1:
+            return CustomDataFrame(ret[0])
+
+        return tuple([CustomDataFrame(df) for df in ret])
+
+
+
 
 
 if __name__ == "__main__":
@@ -113,4 +306,48 @@ if __name__ == "__main__":
     # close = data.get("price:close")
     # print("收盤價:", close)
     # 測試輸出財報資料
-    roe = data.get("report:roe, EPS")
+    # roe = data.get("report:roe, EPS")
+    # print(roe)
+    # rsi = data.indicator('RSI')
+    # print(rsi)
+    # rsi.to_csv('./OutputFile/self_rsi.csv')
+
+    # price = data.handle_price_data()
+    # print(price)
+
+    # all_companys = get_all_company_symbol(data.raw_price_data)
+    # print(all_companys)
+
+    a = adx = data.indicator("MACD")
+    a
+
+    # b = adx = data.indicator("ADX", timeperiod=50)
+    # b
+
+    # talib 所有的指標
+    technical_indicators = [
+    'ACOS', 'AD', 'ADD', 'ADOSC', 'ADX', 'ADXR', 'APO', 'AROON', 'AROONOSC',
+    'ASIN', 'ATAN', 'ATR', 'AVGPRICE', 'BBANDS', 'BETA', 'BOP', 'CCI',
+    'CDLABANDONEDBABY', 'CDLADVANCEBLOCK', 'CDLBELTHOLD', 'CDLBREAKAWAY',
+    'CDLCLOSINGMARUBOZU', 'CDLCONCEALBABYSWALL', 'CDLCOUNTERATTACK',
+    'CDLDARKCLOUDCOVER', 'CDLDOJI', 'CDLDOJISTAR', 'CDLDRAGONFLYDOJI',
+    'CDLENGULFING', 'CDLEVENINGDOJISTAR', 'CDLEVENINGSTAR', 'CDLGAPSIDESIDEWHITE',
+    'CDLGRAVESTONEDOJI', 'CDLHAMMER', 'CDLHANGINGMAN', 'CDLHARAMI', 'CDLHARAMICROSS',
+    'CDLHIGHWAVE', 'CDLHIKKAKE', 'CDLHIKKAKEMOD', 'CDLHOMINGPIGEON', 'CDLINNECK',
+    'CDLINVERTEDHAMMER', 'CDLKICKING', 'CDLKICKINGBYLENGTH', 'CDLLADDERBOTTOM',
+    'CDLLONGLEGGEDDOJI', 'CDLLONGLINE', 'CDLMARUBOZU', 'CDLMATCHINGLOW',
+    'CDLMATHOLD', 'CDLMORNINGDOJISTAR', 'CDLMORNINGSTAR', 'CDLONNECK', 'CDLPIERCING',
+    'CDLRICKSHAWMAN', 'CDLSEPARATINGLINES', 'CDLSHOOTINGSTAR', 'CDLSHORTLINE',
+    'CDLSPINNINGTOP', 'CDLSTALLEDPATTERN', 'CDLSTICKSANDWICH', 'CDLTAKURI',
+    'CDLTASUKIGAP', 'CDLTHRUSTING', 'CDLTRISTAR', 'CEIL', 'CMO', 'CORREL', 'COS',
+    'COSH', 'DEMA', 'DIV', 'DX', 'EMA', 'EXP', 'FLOOR', 'KAMA', 'LINEARREG', 'LN',
+    'MA', 'MACD', 'MACDEXT', 'MACDFIX', 'MAMA', 'MAVP', 'MAX', 'MAXINDEX',
+    'MEDPRICE', 'MFI', 'MIDPOINT', 'MIDPRICE', 'MIN', 'MININDEX', 'MINMAX',
+    'MINMAXINDEX', 'MOM', 'MULT', 'NATR', 'OBV', 'PPO', 'ROC', 'ROCP', 'ROCR',
+    'RSI', 'SAR', 'SAREXT', 'SIN', 'SINH', 'SMA', 'SQRT', 'STDDEV', 'STOCH',
+    'STOCHF', 'STOCHRSI', 'SUB', 'SUM', 'TAN', 'TANH', 'TEMA', 'TRANGE', 'TRIMA',
+    'TRIX', 'TSF', 'TYPPRICE', 'ULTOSC', 'VAR', 'WCLPRICE', 'WILLR', 'WMA'
+    ]   
+
+    # # 打印列表
+    # print(technical_indicators)
