@@ -1,5 +1,7 @@
 import configparser
 from utils.config import Config
+from dataframe import CustomDataFrame
+
 import pymysql
 import pandas as pd
 
@@ -51,10 +53,10 @@ class Database:
 
             # 選取台股(有帶入一些條件，避免數量過多)
             sql = " SELECT company_symbol,name,date,open,high,low,close,volume,market_capital \
-                    FROM peiwentest.company RIGHT JOIN peiwentest.stock ON company.id = stock.company_id \
-                    WHERE exchange_name = 'TWSE'"
-            # AND company_symbol>8700 \
-            # AND company_symbol<9000"
+                    FROM company RIGHT JOIN stock ON company.id = stock.company_id \
+                    WHERE exchange_name='TWSE'\
+                    AND company_symbol>8700 \
+                    AND company_symbol<9000"
             # AND date > 2020-01-01"
 
             cursor.execute(sql)
@@ -70,7 +72,7 @@ class Database:
                 "volume",
                 "market_capital",
             ]
-            df = pd.DataFrame(data, columns=columns)
+            df = CustomDataFrame(data, columns=columns)
             # print(df)
             return df
 
@@ -87,15 +89,15 @@ class Database:
             sql = " SELECT date, company_symbol, factor_name, factor_value \
                     FROM factor RIGHT JOIN factorvalue ON factor.id = factorvalue.factor_id  \
                     LEFT JOIN  company ON factorvalue.company_id = company.id \
-                    WHERE exchange_name='TWSE'"
-            # AND company_symbol>8700 \
-            # AND company_symbol<9000"
+                    WHERE exchange_name='TWSE'\
+                    AND company_symbol>8700 \
+                    AND company_symbol<9000"
             # AND date > 2020-01-01"
 
             cursor.execute(sql)
             data = cursor.fetchall()
             columns = ["date", "company_symbol", "factor_name", "factor_value"]
-            df = pd.DataFrame(data, columns=columns)
+            df = CustomDataFrame(data, columns=columns)
             # print('The raw data get from database:\n')
             # print(df)
             return df
@@ -108,6 +110,18 @@ class Database:
 
 if __name__ == "__main__":
     db = Database()
-    db.get_finance_report()
+    db.create_connection()
+
+    daily = db.get_daily_stock()
+    # daily.to_csv('./OutputFile/daily.csv')
+
+    # finance = db.get_finance_report()
+    # 使用布林索引過濾 DataFrame，擷取 "加工業" 種類的收盤價資料
+    filtered_df = daily[daily["company_symbol"] == "8905"]
+    filtered_df.set_index("date", inplace=True)
+    # 升序排序日期索引
+    filtered_df = filtered_df.sort_index(ascending=True)
+
+    filtered_df.to_csv("./OutputFile/filtered_df.csv")
 
     # db.select_index('open')
