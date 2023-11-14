@@ -56,11 +56,10 @@ class Backtest():
         # 讓日期格式一致
         stock.index = pd.to_datetime(stock.index, format="%Y-%m-%d")
         stock.ffill(inplace=True)
+        stock_price = stock.asfreq("D", method="ffill")
         stock = stock.asfreq("D", method="ffill")
         stock = stock.loc[stock.index.isin(self.position.index)]
-        # 新增現金選項
-        stock['cash'] = 1
-        return stock
+        return stock_price, stock
 
     def calc_weighted_positions(self,position, position_limit):  # 計算權重
         position.index = pd.to_datetime(position.index)
@@ -213,7 +212,7 @@ class Backtest():
         yearly_return : 年回報
         公式 : 今年投資組合價值/去年的投資組合價值
         可以用pct_change()，但因第一年會有沒有值的情況，
-        因此先計算【日回報】，再利用(1+r1)*(1+r2)*...*(1+rn)-1來計算每年回報
+        因此先計算【日回報】，再利用 (1+r1)*(1+r2)*...*(1+rn)-1 來計算每年回報
 
         return:
             dataframe: columns:年分
