@@ -40,7 +40,7 @@ class Backtest():
         all_close = data.get("price:close")
         all_close.index = pd.to_datetime(all_close.index, format="%Y-%m-%d")
         self.df_dict = {}
-        for symbol, position in self.position.drop(['cash'], axis=1).items():
+        for symbol, position in self.position.items():
             start = position.index[0]
             end = position.index[-1]
             all_close = all_close[start:end]
@@ -49,7 +49,7 @@ class Backtest():
 
         # 原本的DF 有開高低收量
         stock = pd.concat(
-            [self.df_dict[symbol] for symbol in self.position.drop(['cash'],axis=1).columns.tolist()],
+            [self.df_dict[symbol] for symbol in self.position.columns.tolist()],
             axis=1,
             keys=self.position.columns.tolist(),
         )
