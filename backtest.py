@@ -19,9 +19,9 @@ def get_stock_data(position):
     all_close = data.get("price:close")
     all_close.index = pd.to_datetime(all_close.index, format="%Y-%m-%d")
     df_dict = {}
-    for symbol, position in position.items():
-        start = position.index[0]
-        end = position.index[-1]
+    for symbol, p in position.items():
+        start = p.index[0]
+        end = p.index[-1]
         all_close = all_close[start:end]
         df_dict[symbol] = all_close[symbol]
     # print("self.df_dict:", self.df_dict)
