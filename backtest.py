@@ -83,7 +83,7 @@ def position_resample(position, resample):
 
     return position
 
-def sim(self, position, resample='D', init_portfolio_value = 10**6,  position_limit=1, fee_ratio=1.425/1000, tax_ratio=3/1000):
+def sim(position, resample='D', init_portfolio_value = 10**6,  position_limit=1, fee_ratio=1.425/1000, tax_ratio=3/1000):
     # 初始金額
     # self.init_portfolio_value = init_portfolio_value
     position = position_resample(position, resample)
