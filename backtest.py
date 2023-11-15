@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
+import report
 from plotly.subplots import make_subplots
 from get_data import Data
 
@@ -168,6 +169,8 @@ def sim(self, position, resample='D', init_portfolio_value = 10**6,  position_li
 
     # 累計報酬
     stock_data['cum_returns'] = stock_data['portfolio_returns'].add(1).cumprod()
+    
+    r = report.Report(stock_data)
 
-    return stock_data
+    return r
 
