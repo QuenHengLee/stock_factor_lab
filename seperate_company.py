@@ -1,6 +1,6 @@
 from get_data import Data
 from database import Database
-from backtest import Backtest
+from Backtest import Backtest
 from datetime import datetime
 import pandas as pd
 from dataframe import CustomDataFrame
