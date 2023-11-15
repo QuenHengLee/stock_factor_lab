@@ -40,7 +40,7 @@ class Backtest():
         all_close = data.get("price:close")
         all_close.index = pd.to_datetime(all_close.index, format="%Y-%m-%d")
         self.df_dict = {}
-        for symbol, position in self.position.drop(['cash'], axis=1).items():
+        for symbol, position in self.position.items():
             start = position.index[0]
             end = position.index[-1]
             all_close = all_close[start:end]
@@ -49,7 +49,7 @@ class Backtest():
 
         # 原本的DF 有開高低收量
         stock = pd.concat(
-            [self.df_dict[symbol] for symbol in self.position.drop(['cash'],axis=1).columns.tolist()],
+            [self.df_dict[symbol] for symbol in self.position.columns.tolist()],
             axis=1,
             keys=self.position.columns.tolist(),
         )
@@ -57,10 +57,10 @@ class Backtest():
         stock.index = pd.to_datetime(stock.index, format="%Y-%m-%d")
         stock.ffill(inplace=True)
         stock = stock.asfreq("D", method="ffill")
+        stock_price = stock.asfreq("D", method="ffill")
         stock = stock.loc[stock.index.isin(self.position.index)]
-        # 新增現金選項
-        stock['cash'] = 1
-        return stock
+
+        return stock_price, stock
 
     def calc_weighted_positions(self,position, position_limit):  # 計算權重
         position.index = pd.to_datetime(position.index)
