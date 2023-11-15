@@ -120,7 +120,8 @@ class Data:
             # 財報資料的Header為大寫
             item = item.upper().replace(" ", "")
             report_data = self.format_report_data(item)
-            return report_data
+            # return report_data
+            return adjust_index_of_report(report_data)
 
         # elif subject == "report":
         #     # 財報資料的Header為大寫
@@ -314,9 +315,6 @@ if __name__ == "__main__":
 
     # all_companys = get_all_company_symbol(data.raw_price_data)
     # print(all_companys)
-
-    a = adx = data.indicator("MACD")
-    a
 
     # b = adx = data.indicator("ADX", timeperiod=50)
     # b
