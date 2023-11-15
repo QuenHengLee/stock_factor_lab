@@ -18,9 +18,22 @@ class Report():
 
     def display(self):
         from IPython.display import display
+        
+        # 計算
+        drawdown, mdd = self.calc_mdd()
+        imp_stats = pd.Series({
+         'annualized_rate_of_return':str(round(self.calc_cagr()*100, 2))+'%',
+         'sharpe': str(0),
+         'max_drawdown':str(round(mdd*100, 2))+'%',
+         'win_ratio':str(round(self.calc_win_ratio()*100, 2))+'%',
+        }).to_frame().T
+        imp_stats.index = ['']
+
         yearly_return_fig = self.create_yearly_return_figure()
         monthly_return_fig = self.create_monthly_return_figure()
 
+        # show出來
+        display(imp_stats)
         display(yearly_return_fig)
         display(monthly_return_fig)
     
@@ -100,6 +113,12 @@ class Report():
 
         return fig
 
+    def calc_win_ratio(self):
+        '''
+        計算勝率是看每天報酬>0的天數/總天數
+        '''
+        trades = self.stock_data.replace([0],np.nan).dropna()
+        return sum(trades['portfolio_returns'] > 0) / len(trades) if len(trades) != 0 else 0
 
     def calc_mdd(self):
         '''
@@ -116,11 +135,11 @@ class Report():
         r = self.stock_data['cum_returns']
         dd = r.div(r.cummax()).sub(1)
         mdd = dd.min()
-        end = dd.idxmin()
-        start = r.loc[:end].idxmax()
-        days = end-start
+        # end = dd.idxmin()
+        # start = r.loc[:end].idxmax()
+        # days = end-start
 
-        return dd, mdd, start, end, days
+        return dd, mdd
 
     def calc_cagr(self):
         '''
