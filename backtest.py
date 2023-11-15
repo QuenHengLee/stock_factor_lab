@@ -171,11 +171,3 @@ def sim(self, position, resample='D', init_portfolio_value = 10**6,  position_li
 
     return stock_data
 
-# 用來安全進行除法的函數。如果分母 d 不等於零，則返回 n / d，否則返回 0。
-def safe_division(n, d):
-    return n / d if d else 0
-
-# 用來將dataframe按照月份排列
-def sort_month(df):
-    month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    return df[month_order]
