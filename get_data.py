@@ -9,17 +9,20 @@ import numpy as np
 # Abstract API：
 from talib import abstract
 
+
 def get_input_args(attr):
     input_names = attr.input_names
     refine_input_names = []
     for key, val in input_names.items():
-        if 'price' in key:
+        if "price" in key:
             if isinstance(val, list):
                 refine_input_names += val
             elif isinstance(val, str):
                 refine_input_names.append(val)
 
     return refine_input_names
+
+
 class Data:
     def __init__(self):
         """
@@ -118,7 +121,7 @@ class Data:
             item = item.upper().replace(" ", "")
             report_data = self.format_report_data(item)
             return report_data
-        
+
         # elif subject == "report":
         #     # 財報資料的Header為大寫
         #     item = item.upper().replace(" ", "")
@@ -137,11 +140,7 @@ class Data:
         else:
             print("目前資料來源有price、report")
 
-
-
-
-
-    def indicator(self, indname, adjust_price=False, resample='D',  **kwargs):
+    def indicator(self, indname, adjust_price=False, resample="D", **kwargs):
         """支援 Talib 和 pandas_ta 上百種技術指標，計算 2000 檔股票、10年的所有資訊。
 
         在使用這個函式前，需要安裝計算技術指標的 Packages
@@ -165,20 +164,20 @@ class Data:
         try:
             from talib import abstract
             import talib
+
             attr = getattr(abstract, indname)
             # print("計算指標:", attr)
-            package = 'talib'
+            package = "talib"
         except:
             try:
                 import pandas_ta
+
                 # test df.ta has attribute
                 getattr(pd.DataFrame().ta, indname)
                 attr = lambda df, **kwargs: getattr(df.ta, indname)(**kwargs)
-                package = 'pandas_ta'
+                package = "pandas_ta"
             except:
-                raise Exception(
-                    "Please install TA-Lib or pandas_ta to get indicators.")
-
+                raise Exception("Please install TA-Lib or pandas_ta to get indicators.")
 
         # market = get_market_info(user_market_info=market)
 
@@ -188,13 +187,13 @@ class Data:
         # low = market.get_price('low', adj=adjust_price)
         # volume = market.get_price('volume', adj=adjust_price)
 
-        close =  self.get('price:close')
-        open_ =  self.get('price:open')
-        high =  self.get('price:high')
-        low =  self.get('price:low')
-        volume =  self.get('price:volume')
+        close = self.get("price:close")
+        open_ = self.get("price:open")
+        high = self.get("price:high")
+        low = self.get("price:low")
+        volume = self.get("price:volume")
 
-        if resample.upper() != 'D':
+        if resample.upper() != "D":
             close = close.resample(resample).last()
             open_ = open_.resample(resample).first()
             high = high.resample(resample).max()
@@ -205,28 +204,32 @@ class Data:
         default_output_columns = None
         for key in close.columns:
             # 組成單一公司的開高低收量
-            prices = {'open': open_[key].ffill(),
-                    'high': high[key].ffill(),
-                    'low': low[key].ffill(),
-                    'close': close[key].ffill(),
-                    'volume': volume[key].ffill()}
+            # 這邊也跟計算效能有關
 
-            if package == 'pandas_ta':
+            prices = {
+                "open": open_[key].ffill(),
+                "high": high[key].ffill(),
+                "low": low[key].ffill(),
+                "close": close[key].ffill(),
+                "volume": volume[key].ffill(),
+            }
+
+            if package == "pandas_ta":
                 prices = pd.DataFrame(prices)
                 s = attr(prices, **kwargs)
 
-            elif package == 'talib':
+            elif package == "talib":
                 # abstract_input 存放該指標需要開/高/低/收哪幾項
                 # 以idname='AD'為例，abstract_input = ['high', 'low', 'close', 'volume']
                 abstract_input = list(attr.input_names.values())[0]
                 abstract_input = get_input_args(attr)
 
                 # quick fix talib bug
-                if indname == 'OBV':
-                    abstract_input = ['close', 'volume']
+                if indname == "OBV":
+                    abstract_input = ["close", "volume"]
 
-                if indname == 'BETA':
-                    abstract_input = ['high', 'low']
+                if indname == "BETA":
+                    abstract_input = ["high", "low"]
 
                 if isinstance(abstract_input, str):
                     abstract_input = [abstract_input]
@@ -240,10 +243,8 @@ class Data:
                 # type(s): dict/ndarray
                 s = attr(*paras, **kwargs)
 
-                 
             else:
                 raise Exception("Cannot determine technical package from indname")
-
 
             # 根據回傳的資料格式，搭配不同的處理方法
             # 最後要統一格式成dict
@@ -267,7 +268,6 @@ class Data:
                 # print("result of cal is: DataFrame")
                 s = {i: series.values for i, series in s.items()}
 
-
             if default_output_columns is None:
                 default_output_columns = list(s.keys())
 
@@ -278,9 +278,8 @@ class Data:
             for colname, series in s.items():
                 if colname not in dfs:
                     dfs[colname] = {}
-                dfs[colname][key] = series if isinstance(
-                    series, pd.Series) else series
-                
+                dfs[colname][key] = series if isinstance(series, pd.Series) else series
+
             # print("dfs:", dfs)
 
         newdic = {}
@@ -289,15 +288,13 @@ class Data:
             newdic[key] = pd.DataFrame(df, index=close.index)
 
         ret = [newdic[n] for n in default_output_columns]
-        ret = [d.apply(lambda s:pd.to_numeric(s, errors='coerce')) for d in ret]
+        ret = [d.apply(lambda s: pd.to_numeric(s, errors="coerce")) for d in ret]
 
         if len(ret) == 1:
             return CustomDataFrame(ret[0])
 
+        # 回傳tuple
         return tuple([CustomDataFrame(df) for df in ret])
-
-
-
 
 
 if __name__ == "__main__":
@@ -323,31 +320,3 @@ if __name__ == "__main__":
 
     # b = adx = data.indicator("ADX", timeperiod=50)
     # b
-
-    # talib 所有的指標
-    technical_indicators = [
-    'ACOS', 'AD', 'ADD', 'ADOSC', 'ADX', 'ADXR', 'APO', 'AROON', 'AROONOSC',
-    'ASIN', 'ATAN', 'ATR', 'AVGPRICE', 'BBANDS', 'BETA', 'BOP', 'CCI',
-    'CDLABANDONEDBABY', 'CDLADVANCEBLOCK', 'CDLBELTHOLD', 'CDLBREAKAWAY',
-    'CDLCLOSINGMARUBOZU', 'CDLCONCEALBABYSWALL', 'CDLCOUNTERATTACK',
-    'CDLDARKCLOUDCOVER', 'CDLDOJI', 'CDLDOJISTAR', 'CDLDRAGONFLYDOJI',
-    'CDLENGULFING', 'CDLEVENINGDOJISTAR', 'CDLEVENINGSTAR', 'CDLGAPSIDESIDEWHITE',
-    'CDLGRAVESTONEDOJI', 'CDLHAMMER', 'CDLHANGINGMAN', 'CDLHARAMI', 'CDLHARAMICROSS',
-    'CDLHIGHWAVE', 'CDLHIKKAKE', 'CDLHIKKAKEMOD', 'CDLHOMINGPIGEON', 'CDLINNECK',
-    'CDLINVERTEDHAMMER', 'CDLKICKING', 'CDLKICKINGBYLENGTH', 'CDLLADDERBOTTOM',
-    'CDLLONGLEGGEDDOJI', 'CDLLONGLINE', 'CDLMARUBOZU', 'CDLMATCHINGLOW',
-    'CDLMATHOLD', 'CDLMORNINGDOJISTAR', 'CDLMORNINGSTAR', 'CDLONNECK', 'CDLPIERCING',
-    'CDLRICKSHAWMAN', 'CDLSEPARATINGLINES', 'CDLSHOOTINGSTAR', 'CDLSHORTLINE',
-    'CDLSPINNINGTOP', 'CDLSTALLEDPATTERN', 'CDLSTICKSANDWICH', 'CDLTAKURI',
-    'CDLTASUKIGAP', 'CDLTHRUSTING', 'CDLTRISTAR', 'CEIL', 'CMO', 'CORREL', 'COS',
-    'COSH', 'DEMA', 'DIV', 'DX', 'EMA', 'EXP', 'FLOOR', 'KAMA', 'LINEARREG', 'LN',
-    'MA', 'MACD', 'MACDEXT', 'MACDFIX', 'MAMA', 'MAVP', 'MAX', 'MAXINDEX',
-    'MEDPRICE', 'MFI', 'MIDPOINT', 'MIDPRICE', 'MIN', 'MININDEX', 'MINMAX',
-    'MINMAXINDEX', 'MOM', 'MULT', 'NATR', 'OBV', 'PPO', 'ROC', 'ROCP', 'ROCR',
-    'RSI', 'SAR', 'SAREXT', 'SIN', 'SINH', 'SMA', 'SQRT', 'STDDEV', 'STOCH',
-    'STOCHF', 'STOCHRSI', 'SUB', 'SUM', 'TAN', 'TANH', 'TEMA', 'TRANGE', 'TRIMA',
-    'TRIX', 'TSF', 'TYPPRICE', 'ULTOSC', 'VAR', 'WCLPRICE', 'WILLR', 'WMA'
-    ]   
-
-    # # 打印列表
-    # print(technical_indicators)
