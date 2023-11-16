@@ -170,7 +170,7 @@ def sim(position, resample='D', init_portfolio_value = 10**6,  position_limit=1,
     # 累計報酬
     stock_data['cum_returns'] = stock_data['portfolio_returns'].add(1).cumprod()
     
-    r = report.Report(stock_data)
+    r = report.Report(stock_data, position)
 
     return r
 
