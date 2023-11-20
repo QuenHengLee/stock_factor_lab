@@ -26,7 +26,7 @@ class Report():
         imp_stats = pd.Series({
          'annualized_rate_of_return':str(round(self.calc_cagr()*100, 2))+'%',
          'sharpe': str(0),
-         'max_drawdown':str(round(self.calc_mdd().min()*100, 2))+'%',
+         'max_drawdown':str(round(self.calc_dd().min()*100, 2))+'%',
          'win_ratio':str(round(self.calc_win_ratio()*100, 2))+'%',
         }).to_frame().T
         imp_stats.index = ['']
@@ -125,7 +125,7 @@ class Report():
         def diff(s, period):
             return (s / s.shift(period) - 1)
 
-        drawdowns = self.calc_mdd()
+        drawdowns = self.calc_dd()
         performance_detail = self.stock_data.replace([0],np.nan).dropna()
         position = position.loc[position.index.isin(performance_detail.index)]
         nstocks = (position != 0).sum(axis=1)
@@ -186,7 +186,7 @@ class Report():
         trades = self.stock_data.replace([0],np.nan).dropna()
         return sum(trades['portfolio_returns'] > 0) / len(trades) if len(trades) != 0 else 0
 
-    def calc_mdd(self):
+    def calc_dd(self):
         '''
         計算Drawdown的方式是找出截至當下的最大累計報酬(%)除以當下的累計報酬
         所以用累計報酬/累計報酬.cummax()
