@@ -19,9 +19,9 @@ def get_stock_data(position):
     all_close = data.get("price:close")
     all_close.index = pd.to_datetime(all_close.index, format="%Y-%m-%d")
     df_dict = {}
-    for symbol, position in position.items():
-        start = position.index[0]
-        end = position.index[-1]
+    for symbol, p in position.items():
+        start = p.index[0]
+        end = p.index[-1]
         all_close = all_close[start:end]
         df_dict[symbol] = all_close[symbol]
     # print("self.df_dict:", self.df_dict)
@@ -84,7 +84,7 @@ def position_resample(position, resample):
 
     return position
 
-def sim(self, position, resample='D', init_portfolio_value = 10**6,  position_limit=1, fee_ratio=1.425/1000, tax_ratio=3/1000):
+def sim(position, resample='D', init_portfolio_value = 10**6,  position_limit=1, fee_ratio=1.425/1000, tax_ratio=3/1000):
     # 初始金額
     # self.init_portfolio_value = init_portfolio_value
     position = position_resample(position, resample)
@@ -170,7 +170,7 @@ def sim(self, position, resample='D', init_portfolio_value = 10**6,  position_li
     # 累計報酬
     stock_data['cum_returns'] = stock_data['portfolio_returns'].add(1).cumprod()
     
-    r = report.Report(stock_data)
+    r = report.Report(stock_data, position)
 
     return r
 
