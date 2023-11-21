@@ -10,17 +10,41 @@ import finlab.market_info
 
 logger = logging.getLogger(__name__)
 
-def reshape_operations(cls):
 
+def reshape_operations(cls):
     # Define a mapping of operations to override to their corresponding pandas method
     methods_to_check = [
-        '__getitem__',
-        '__add__', '__sub__', '__mul__', '__truediv__', '__floordiv__',
-        '__mod__', '__pow__', '__lshift__', '__rshift__', '__and__',
-        '__or__', '__xor__', '__iadd__', '__isub__', '__imul__',
-        '__itruediv__', '__ifloordiv__', '__imod__', '__ipow__',
-        '__ilshift__', '__irshift__', '__iand__', '__ior__', '__ixor__',
-        '__lt__', '__le__', '__eq__', '__ne__', '__gt__', '__ge__',
+        "__getitem__",
+        "__add__",
+        "__sub__",
+        "__mul__",
+        "__truediv__",
+        "__floordiv__",
+        "__mod__",
+        "__pow__",
+        "__lshift__",
+        "__rshift__",
+        "__and__",
+        "__or__",
+        "__xor__",
+        "__iadd__",
+        "__isub__",
+        "__imul__",
+        "__itruediv__",
+        "__ifloordiv__",
+        "__imod__",
+        "__ipow__",
+        "__ilshift__",
+        "__irshift__",
+        "__iand__",
+        "__ior__",
+        "__ixor__",
+        "__lt__",
+        "__le__",
+        "__eq__",
+        "__ne__",
+        "__gt__",
+        "__ge__",
     ]
 
     # find operation mapping that map str -> function for the function need reshape.
@@ -33,7 +57,7 @@ def reshape_operations(cls):
             method = getattr(base_class, method_name)
             params = inspect.signature(method).parameters
             can_accept_df = any(
-                param.annotation == pd.DataFrame or param.annotation == inspect._empty 
+                param.annotation == pd.DataFrame or param.annotation == inspect._empty
                 for param in params.values()
             )
             if can_accept_df:
@@ -43,27 +67,25 @@ def reshape_operations(cls):
 
     for op, pandas_method in operations_mapping.items():
         if hasattr(cls, op):
-            
+
             def make_wrapped_method(op):
                 def wrapped_method(self, other, pandas_method=pandas_method):
-                    
                     df1, df2 = self.reshape(self, other)
 
-                    if isinstance(other, pd.Series) and op == '__getitem__':
+                    if isinstance(other, pd.Series) and op == "__getitem__":
                         return df1.loc[df2.iloc[:, 0]]
 
                     return pandas_method(df1, df2)
 
                 return wrapped_method
-                
+
             setattr(cls, op, make_wrapped_method(op))
 
     return cls
 
 
 def get_index_str_frequency(df):
-
-    if not hasattr(df, 'index'):
+    if not hasattr(df, "index"):
         return None
 
     if len(df.index) == 0:
@@ -72,11 +94,11 @@ def get_index_str_frequency(df):
     if not isinstance(df.index[0], str):
         return None
 
-    if (df.index.str.find('M') != -1).all():
-        return 'month'
+    if (df.index.str.find("M") != -1).all():
+        return "month"
 
-    if (df.index.str.find('Q') != -1).all():
-        return 'season'
+    if (df.index.str.find("Q") != -1).all():
+        return "season"
 
     return None
 
@@ -118,18 +140,16 @@ class CustomDataFrame(pd.DataFrame):
     2. 在做四則運算、不等式運算前，會將 df1、df2 的 index 取聯集，column 取交集。
     """
 
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.id = uuid.uuid4().int
 
     @property
-    def _constructor(self):        
+    def _constructor(self):
         return CustomDataFrame
 
     @staticmethod
     def reshape(df1, df2):
-
         isdf1 = isinstance(df1, pd.DataFrame)
         isdf2 = isinstance(df2, pd.DataFrame) or isinstance(df2, pd.Series)
 
@@ -140,21 +160,28 @@ class CustomDataFrame(pd.DataFrame):
             df2 = CustomDataFrame({c: df2 for c in df1.columns})
             if d2_index_freq:
                 # tell user has high chance to use future data
-                logger.warning('Detect pd.Series has season/month index, the chance of using future data is high!\n'
-                               'Please convert index from str to date first then perform calculations.\n'
-                               'Example: df.quantile(0.3, axis=1) -> df.index_str_to_date().quantile(0.3, axis=1)'
-                               )
+                logger.warning(
+                    "Detect pd.Series has season/month index, the chance of using future data is high!\n"
+                    "Please convert index from str to date first then perform calculations.\n"
+                    "Example: df.quantile(0.3, axis=1) -> df.index_str_to_date().quantile(0.3, axis=1)"
+                )
 
-        if ((d1_index_freq or d2_index_freq)
-            and (d1_index_freq != d2_index_freq)) and isdf1 and isdf2:
-
+        if (
+            ((d1_index_freq or d2_index_freq) and (d1_index_freq != d2_index_freq))
+            and isdf1
+            and isdf2
+        ):
             df1 = df1.index_str_to_date() if isinstance(df1, CustomDataFrame) else df1
             df2 = df2.index_str_to_date() if isinstance(df2, CustomDataFrame) else df2
 
-        if (isdf1 and isdf2 and len(df1) and len(df2)
-            and isinstance(df1.index[0], pd.Timestamp) 
-            and isinstance(df2.index[0], pd.Timestamp)):
-            
+        if (
+            isdf1
+            and isdf2
+            and len(df1)
+            and len(df2)
+            and isinstance(df1.index[0], pd.Timestamp)
+            and isinstance(df2.index[0], pd.Timestamp)
+        ):
             index = df1.index.union(df2.index)
             columns = df1.columns.intersection(df2.columns)
 
@@ -162,15 +189,16 @@ class CustomDataFrame(pd.DataFrame):
                 index_start = max(df1.index[0], df2.index[0])
                 index = [t for t in index if index_start <= t]
 
-            return df1.reindex(index=index, method='ffill')[columns], \
-                df2.reindex(index=index, method='ffill')[columns]
+            return (
+                df1.reindex(index=index, method="ffill")[columns],
+                df2.reindex(index=index, method="ffill")[columns],
+            )
 
         return df1, df2
 
-
     @lru_cache(maxsize=None)
     def index_str_to_date(self):
-      """財務月季報索引格式轉換
+        """財務月季報索引格式轉換
 
         將以下資料的索引轉換成datetime格式:
 
@@ -185,50 +213,57 @@ class CustomDataFrame(pd.DataFrame):
             ```py
             data.get('financial_statement:現金及約當現金').index_str_to_date()
             ```
-      """
-      if len(self.index) == 0 or not isinstance(self.index[0], str):
+        """
+        if len(self.index) == 0 or not isinstance(self.index[0], str):
+            return self
+
+        if self.index[0].find("M") != -1:
+            return self._index_str_to_date_month()
+        elif self.index[0].find("Q") != -1:
+            if self.index[0].find("US-ALL") != -1:
+                return self._index_str_to_date_season(market="us_stock_all")
+            elif self.index[0].find("US") != -1:
+                return self._index_str_to_date_season(market="us_stock")
+            else:
+                return self._index_str_to_date_season()
+
         return self
 
-      if self.index[0].find('M') != -1:
-        return self._index_str_to_date_month()
-      elif self.index[0].find('Q') != -1:
-        if self.index[0].find('US-ALL') != -1:
-          return self._index_str_to_date_season(market='us_stock_all')
-        elif self.index[0].find('US') != -1:
-          return self._index_str_to_date_season(market='us_stock')
-        else:
-          return self._index_str_to_date_season()
-
-      return self
-
     def __hash__(self):
-        if not hasattr(self, 'id'):
+        if not hasattr(self, "id"):
             self.id = uuid.uuid4().int
         return self.id
 
     @staticmethod
     def to_business_day(date, close=None):
-
         def skip_weekend(d):
             add_days = {5: 2, 6: 1}
             wd = d.weekday()
-            if wd in add_days: d += datetime.timedelta(days=add_days[wd])
+            if wd in add_days:
+                d += datetime.timedelta(days=add_days[wd])
             return d
-        
-        if close is None:
-          from finlab import data
-          close = data.get('price:收盤價')
 
-        return pd.Series(date).apply(lambda d: skip_weekend(d) if d in close.index or d < close.index[0] or d > close.index[-1] else close.loc[d:].index[0]).values
-    
+        if close is None:
+            from finlab import data
+
+            close = data.get("price:收盤價")
+
+        return (
+            pd.Series(date)
+            .apply(
+                lambda d: skip_weekend(d)
+                if d in close.index or d < close.index[0] or d > close.index[-1]
+                else close.loc[d:].index[0]
+            )
+            .values
+        )
 
     def _index_date_to_str_month(self):
-
         # index is already str
         if len(self.index) == 0 or not isinstance(self.index[0], pd.Timestamp):
             return self
 
-        index = (self.index - datetime.timedelta(days=30)).strftime('%Y-M%m')
+        index = (self.index - datetime.timedelta(days=30)).strftime("%Y-M%m")
         df = CustomDataFrame(self.values, index=index, columns=self.columns)
 
         return df
@@ -238,116 +273,122 @@ class CustomDataFrame(pd.DataFrame):
 
         # index is already timestamps
         if len(self.index) == 0 or not isinstance(self.index[0], str):
-          return self
+            return self
 
         global monthly_index
 
         if monthly_index is None:
-            rev = data.get('monthly_revenue:當月營收', force_download=True)
+            rev = data.get("monthly_revenue:當月營收", force_download=True)
 
-        if not (self.index.str.find('M') != -1).all():
-          logger.warning('CustomDataFrame: invalid index, cannot format index to monthly timestamp.')
-          return self
+        if not (self.index.str.find("M") != -1).all():
+            logger.warning(
+                "CustomDataFrame: invalid index, cannot format index to monthly timestamp."
+            )
+            return self
 
         index = monthly_index
         index = self.to_business_day(index)
 
         ret = CustomDataFrame(self.values, index=index, columns=self.columns)
-        ret.index.name = 'date'
- 
+        ret.index.name = "date"
+
         return ret
 
     def _index_to_business_day(self):
-
         index = self.to_business_day(self.index)
         ret = CustomDataFrame(self.values, index=index, columns=self.columns)
-        ret.index.name = 'date'
+        ret.index.name = "date"
         return ret
-    
-    def _index_date_to_str_season(self, postfix=''):
 
+    def _index_date_to_str_season(self, postfix=""):
         # index is already str
         if len(self.index) == 0 or not isinstance(self.index[0], pd.Timestamp):
-          return self
-          
+            return self
+
         year = self.index.year.copy()
         if postfix:
-          q = self.index.strftime('%m').astype(int).map({3:1, 6:2, 9:3, 12:4})
+            q = self.index.strftime("%m").astype(int).map({3: 1, 6: 2, 9: 3, 12: 4})
         else:
-          q = self.index.strftime('%m').astype(int).map({5:1, 8:2, 9:2, 10:3, 11:3, 3:4, 4:4})
-          year -= (q == 4)
-        index = year.astype(str) + f'{postfix}-Q' + q.astype(str)
+            q = (
+                self.index.strftime("%m")
+                .astype(int)
+                .map({5: 1, 8: 2, 9: 2, 10: 3, 11: 3, 3: 4, 4: 4})
+            )
+            year -= q == 4
+        index = year.astype(str) + f"{postfix}-Q" + q.astype(str)
         return CustomDataFrame(self.values, index=index, columns=self.columns)
 
     def deadline(self):
         """財務索引轉換成公告截止日
 
-          將財務季報 (ex:2022Q1) 從文字格式轉為公告截止日的datetime格式，
-          通常使用情境為對不同週期的dataframe做reindex，常用於以公告截止日作為訊號產生日。
-          Returns:
-            (pd.DataFrame): data
-          Examples:
-              ```py
-              data.get('financial_statement:現金及約當現金').deadline()
-              data.get('monthly_revenue:當月營收').deadline()
-              ```
+        將財務季報 (ex:2022Q1) 從文字格式轉為公告截止日的datetime格式，
+        通常使用情境為對不同週期的dataframe做reindex，常用於以公告截止日作為訊號產生日。
+        Returns:
+          (pd.DataFrame): data
+        Examples:
+            ```py
+            data.get('financial_statement:現金及約當現金').deadline()
+            data.get('monthly_revenue:當月營收').deadline()
+            ```
         """
         if len(self.index) == 0 or not isinstance(self.index[0], str):
             return self
-        
-        if self.index[0].find('M') != -1:
+
+        if self.index[0].find("M") != -1:
             return self._index_str_to_date_month()
-        elif self.index[0].find('Q') != -1:
+        elif self.index[0].find("Q") != -1:
             return self._index_str_to_date_season(detail=False)
 
-        raise Exception("Cannot apply deadline to dataframe. "
-                        "Index is not compatable."
-                        "Index should be 2013-Q1 or 2013-M1."
-                        )
+        raise Exception(
+            "Cannot apply deadline to dataframe. "
+            "Index is not compatable."
+            "Index should be 2013-Q1 or 2013-M1."
+        )
 
+    def _index_str_to_date_season(self, detail=True, market="tw_stock"):
+        if market == "tw_stock":
+            from finlab import data
 
-    def _index_str_to_date_season(self, detail=True, market='tw_stock'):
+            if detail:
+                datekey = data.get("etl:financial_statements_disclosure_dates").copy()
+            else:
+                datekey = data.get("etl:financial_statements_deadline").copy()
+        elif market == "us_stock":
+            datekey = data.get("us_fundamental:datekey").copy()
+        elif market == "us_stock_all":
+            datekey = data.get("us_fundamental_all:datekey").copy()
 
-      if market == 'tw_stock':
-          from finlab import data
-          if detail:
-              datekey = data.get('etl:financial_statements_disclosure_dates').copy()
-          else:
-              datekey = data.get('etl:financial_statements_deadline').copy()
-      elif market == 'us_stock':
-          datekey = data.get('us_fundamental:datekey').copy()
-      elif market == 'us_stock_all':
-          datekey = data.get('us_fundamental_all:datekey').copy()
+        disclosure_dates = datekey.reindex_like(self).unstack()
 
-      disclosure_dates = (datekey
-                          .reindex_like(self)
-                          .unstack())
+        if not hasattr(self.columns, "name"):
+            self.columns.name = "symbol"
 
-      if not hasattr(self.columns, 'name'):
-          self.columns.name = 'symbol'
+        col_name = self.columns.name
 
-      col_name = self.columns.name
+        unstacked = self.unstack()
 
-      unstacked = self.unstack()
+        ret = pd.DataFrame(
+            {
+                "value": unstacked.values,
+                "disclosures": disclosure_dates.values,
+            },
+            unstacked.index,
+        )
+        ret.index.names = [col_name, "date"]
+        ret = (
+            ret.reset_index()
+            .drop_duplicates(["disclosures", col_name])
+            .pivot(index="disclosures", columns=col_name, values="value")
+            .ffill()
+            .pipe(lambda df: df.loc[df.index.notna()])
+            .pipe(lambda df: CustomDataFrame(df))
+            .rename_axis("date")
+        )
 
-      ret = pd.DataFrame({
-          'value': unstacked.values,
-          'disclosures': disclosure_dates.values,
-        }, unstacked.index)
-      ret.index.names = [col_name, 'date']
-      ret = (ret
-        .reset_index()
-        .drop_duplicates(['disclosures', col_name])
-        .pivot(index='disclosures', columns=col_name, values='value').ffill()
-        .pipe(lambda df: df.loc[df.index.notna()])
-        .pipe(lambda df: CustomDataFrame(df))
-        .rename_axis('date')
-      )
+        if not detail:
+            ret.index = self.to_business_day(ret.index)
 
-      if not detail:
-          ret.index = self.to_business_day(ret.index)
-
-      return ret
+        return ret
 
     def average(self, n):
         """取 n 筆移動平均
@@ -377,7 +418,7 @@ class CustomDataFrame(pd.DataFrame):
             ```
             <img src="https://i.ibb.co/Mg1P85y/sma.png" alt="sma">
         """
-        return self.rolling(n, min_periods=int(n/2)).mean()
+        return self.rolling(n, min_periods=int(n / 2)).mean()
 
     def is_largest(self, n):
         """取每列前 n 筆大的數值
@@ -398,7 +439,12 @@ class CustomDataFrame(pd.DataFrame):
             good_stocks = roa.is_largest(10)
             ```
         """
-        return self.astype(float).apply(lambda s: s.nlargest(n), axis=1).reindex_like(self).notna()
+        return (
+            self.astype(float)
+            .apply(lambda s: s.nlargest(n), axis=1)
+            .reindex_like(self)
+            .notna()
+        )
 
     def is_smallest(self, n):
         """取每列前 n 筆小的數值
@@ -417,7 +463,12 @@ class CustomDataFrame(pd.DataFrame):
             cheap_stocks = pb.is_smallest(10)
             ```
         """
-        return self.astype(float).apply(lambda s: s.nsmallest(n), axis=1).reindex_like(self).notna()
+        return (
+            self.astype(float)
+            .apply(lambda s: s.nsmallest(n), axis=1)
+            .reindex_like(self)
+            .notna()
+        )
 
     def is_entry(self):
         """進場點
@@ -432,7 +483,7 @@ class CustomDataFrame(pd.DataFrame):
             data.get('price:收盤價').is_largest(10).is_entry()
             ```
         """
-        return (self & ~self.shift(fill_value=False))
+        return self & ~self.shift(fill_value=False)
 
     def is_exit(self):
         """出場點
@@ -447,7 +498,7 @@ class CustomDataFrame(pd.DataFrame):
             data.get('price:收盤價').is_largest(10).is_exit()
             ```
         """
-        return (~self & self.shift(fill_value=False))
+        return ~self & self.shift(fill_value=False)
 
     def rise(self, n=1):
         """數值上升中
@@ -503,41 +554,46 @@ class CustomDataFrame(pd.DataFrame):
             全球 2020 量化寬鬆加上晶片短缺，使得半導體股價淨值比衝高。
         """
         from finlab import data
-        categories = data.get('security_categories')
-        cat = categories.set_index('stock_id').category.to_dict()
+
+        categories = data.get("security_categories")
+        cat = categories.set_index("stock_id").category.to_dict()
         org_set = set(cat.values())
         set_remove_illegal = set(
-            o for o in org_set if isinstance(o, str) and o != 'nan')
+            o for o in org_set if isinstance(o, str) and o != "nan"
+        )
         set_remove_illegal
 
         refine_cat = {}
         for s, c in cat.items():
-            if c == None or c == 'nan':
-                refine_cat[s] = '其他'
+            if c == None or c == "nan":
+                refine_cat[s] = "其他"
                 continue
 
-            if c == '電腦及週邊':
-                refine_cat[s] = '電腦及週邊設備業'
+            if c == "電腦及週邊":
+                refine_cat[s] = "電腦及週邊設備業"
                 continue
 
-            if c[-1] == '業' and c[:-1] in set_remove_illegal:
+            if c[-1] == "業" and c[:-1] in set_remove_illegal:
                 refine_cat[s] = c[:-1]
             else:
                 refine_cat[s] = c
 
-        col_categories = pd.Series(self.columns.map(
-            lambda s: refine_cat[s] if s in cat else '其他'))
+        col_categories = pd.Series(
+            self.columns.map(lambda s: refine_cat[s] if s in cat else "其他")
+        )
 
         return self.groupby(col_categories.values, axis=1)
 
-    def entry_price(self, trade_at='close'):
-
+    def entry_price(self, trade_at="close"):
         signal = self.is_entry()
         from finlab import data
-        adj = data.get('etl:adj_close') if trade_at == 'close' else data.get(
-            'etl:adj_open')
-        adj, signal = adj.reshape(
-            adj.loc[signal.index[0]: signal.index[-1]], signal)
+
+        adj = (
+            data.get("etl:adj_close")
+            if trade_at == "close"
+            else data.get("etl:adj_open")
+        )
+        adj, signal = adj.reshape(adj.loc[signal.index[0] : signal.index[-1]], signal)
         return adj.bfill()[signal.shift(fill_value=False)].ffill()
 
     def sustain(self, nwindow, nsatisfy=None):
@@ -576,22 +632,28 @@ class CustomDataFrame(pd.DataFrame):
         """
         from finlab import data
 
-        themes = (data.get('security_industry_themes')
-            .copy() # 複製
-            .assign(category=lambda self: self.category
-                .apply(lambda s: eval(s))) # 從文字格式轉成陣列格
-            .explode('category') # 展開資料
+        themes = (
+            data.get("security_industry_themes")
+            .copy()  # 複製
+            .assign(
+                category=lambda self: self.category.apply(lambda s: eval(s))
+            )  # 從文字格式轉成陣列格
+            .explode("category")  # 展開資料
         )
 
-        categories = (categories 
-            or set(themes.category[themes.category.str.find(':') == -1]))
+        categories = categories or set(
+            themes.category[themes.category.str.find(":") == -1]
+        )
 
         def calc_rank(ind):
             stock_ids = themes.stock_id[themes.category == ind]
-            return (self[list(stock_ids)].pipe(lambda self: self.rank(axis=1, pct=True)))
+            return self[list(stock_ids)].pipe(lambda self: self.rank(axis=1, pct=True))
 
-        return (pd.concat([calc_rank(ind) for ind in categories],axis=1)
-            .groupby(level=0, axis=1).mean())
+        return (
+            pd.concat([calc_rank(ind) for ind in categories], axis=1)
+            .groupby(level=0, axis=1)
+            .mean()
+        )
 
     def quantile_row(self, c):
         """股票當天數值分位數
@@ -612,7 +674,6 @@ class CustomDataFrame(pd.DataFrame):
         return s
 
     def exit_when(self, exit):
-
         df, exit = self.reshape(self, exit)
 
         df.fillna(False, inplace=True)
@@ -632,7 +693,16 @@ class CustomDataFrame(pd.DataFrame):
         position.fillna(False)
         return position
 
-    def hold_until(self, exit, nstocks_limit=None, stop_loss=-np.inf, take_profit=np.inf, trade_at='close', rank=None, market='AUTO'):
+    def hold_until(
+        self,
+        exit,
+        nstocks_limit=None,
+        stop_loss=-np.inf,
+        take_profit=np.inf,
+        trade_at="close",
+        rank=None,
+        market="AUTO",
+    ):
         """訊號進出場
 
         這大概是所有策略撰寫中，最重要的語法糖，上述語法中 `entries` 為進場訊號，而 `exits` 是出場訊號。所以 `entries.hold_until(exits)` ，就是進場訊號為 `True` 時，買入並持有該檔股票，直到出場訊號為 `True ` 則賣出。
@@ -672,7 +742,7 @@ class CustomDataFrame(pd.DataFrame):
         """
         if nstocks_limit is None:
             nstocks_limit = len(self.columns)
-            
+
         self_reindex = self.index_str_to_date()
         exit_reindex = exit.index_str_to_date()
         rank_reindex = rank.index_str_to_date() if rank is not None else None
@@ -681,20 +751,25 @@ class CustomDataFrame(pd.DataFrame):
         intersect_col = self_reindex.columns.intersection(exit_reindex.columns)
 
         if stop_loss != -np.inf or take_profit != np.inf:
-            market = finlab.market_info.get_market_info(self_reindex, user_market_info=market)
+            market = finlab.market_info.get_market_info(
+                self_reindex, user_market_info=market
+            )
 
             if not isinstance(market, finlab.market_info.MarketInfo):
-                raise Exception("It seems like the market has"
+                raise Exception(
+                    "It seems like the market has"
                     "not been specified well when using the hold_until"
                     " function. Please provide the appropriate"
                     " market parameter to the hold_until function "
                     "to ensure it can determine the correct market"
-                    " for the transaction.")
+                    " for the transaction."
+                )
 
             price = market.get_price(trade_at, adj=True)
 
             union_index = union_index.union(
-                price.loc[union_index[0]: union_index[-1]].index)
+                price.loc[union_index[0] : union_index[-1]].index
+            )
             intersect_col = intersect_col.intersection(price.columns)
         else:
             price = pd.DataFrame()
@@ -704,18 +779,24 @@ class CustomDataFrame(pd.DataFrame):
             union_index = union_index.union(rank_reindex.index)
             intersect_col = intersect_col.intersection(rank_reindex.columns)
 
-        entry = self_reindex.reindex(union_index, columns=intersect_col,
-                             method='ffill').ffill().fillna(False)
-        exit = exit_reindex.reindex(union_index, columns=intersect_col,
-                            method='ffill').ffill().fillna(False)
+        entry = (
+            self_reindex.reindex(union_index, columns=intersect_col, method="ffill")
+            .ffill()
+            .fillna(False)
+        )
+        exit = (
+            exit_reindex.reindex(union_index, columns=intersect_col, method="ffill")
+            .ffill()
+            .fillna(False)
+        )
 
         if price is not None:
-            price = price.reindex(
-                union_index, columns=intersect_col, method='ffill')
+            price = price.reindex(union_index, columns=intersect_col, method="ffill")
 
         if rank_reindex is not None:
             rank_reindex = rank_reindex.reindex(
-                union_index, columns=intersect_col, method='ffill')
+                union_index, columns=intersect_col, method="ffill"
+            )
         else:
             rank_reindex = pd.DataFrame(1, index=union_index, columns=intersect_col)
 
@@ -726,8 +807,16 @@ class CustomDataFrame(pd.DataFrame):
         rank_reindex = (rank_reindex - min_rank) / (max_rank - min_rank)
         rank_reindex.fillna(0, inplace=True)
 
-        def rotate_stocks(ret, entry, exit, nstocks_limit, stop_loss=-np.inf, take_profit=np.inf, price=None, ranking=None):
-
+        def rotate_stocks(
+            ret,
+            entry,
+            exit,
+            nstocks_limit,
+            stop_loss=-np.inf,
+            take_profit=np.inf,
+            price=None,
+            ranking=None,
+        ):
             nstocks = 0
 
             ret[0][np.argsort(entry[0])[-nstocks_limit:]] = 1
@@ -738,13 +827,11 @@ class CustomDataFrame(pd.DataFrame):
             entry_price[:] = np.nan
 
             for i in range(1, entry.shape[0]):
-
                 # regitser entry price
                 if stop_loss != -np.inf or take_profit != np.inf:
-                    is_entry = ((ret[i-2] == 0) if i >
-                                1 else (ret[i-1] == 1))
+                    is_entry = (ret[i - 2] == 0) if i > 1 else (ret[i - 1] == 1)
 
-                    is_waiting_for_entry = np.isnan(entry_price) & (ret[i-1] == 1)
+                    is_waiting_for_entry = np.isnan(entry_price) & (ret[i - 1] == 1)
 
                     is_entry |= is_waiting_for_entry
 
@@ -752,14 +839,15 @@ class CustomDataFrame(pd.DataFrame):
 
                     # check stop_loss and take_profit
                     returns = price[i] / entry_price
-                    stop = (returns > 1 + abs(take_profit)
-                            ) | (returns < 1 - abs(stop_loss))
+                    stop = (returns > 1 + abs(take_profit)) | (
+                        returns < 1 - abs(stop_loss)
+                    )
                     exit[i] |= stop
 
                 # run signal
-                rank = (entry[i] * ranking[i] + ret[i-1] * 3)
+                rank = entry[i] * ranking[i] + ret[i - 1] * 3
                 rank[exit[i] == 1] = -1
-                rank[(entry[i] == 0) & (ret[i-1] == 0)] = -1
+                rank[(entry[i] == 0) & (ret[i - 1] == 0)] = -1
 
                 ret[i][np.argsort(rank)[-nstocks_limit:]] = 1
                 ret[i][rank == -1] = 0
@@ -767,17 +855,19 @@ class CustomDataFrame(pd.DataFrame):
             return ret
 
         ret = pd.DataFrame(0, index=entry.index, columns=entry.columns)
-        ret = rotate_stocks(ret.values,
-                            entry.astype(int).values,
-                            exit.astype(int).values,
-                            nstocks_limit,
-                            stop_loss,
-                            take_profit,
-                            price=price.values,
-                            ranking=rank_reindex.values)
+        ret = rotate_stocks(
+            ret.values,
+            entry.astype(int).values,
+            exit.astype(int).values,
+            nstocks_limit,
+            stop_loss,
+            take_profit,
+            price=price.values,
+            ranking=rank_reindex.values,
+        )
         return pd.DataFrame(ret, index=entry.index, columns=entry.columns).astype(bool)
-    
-    def divide_slice(self, quantile=4):
+
+    def divide_slice(self, quantile=4, ascending=False):
         """
         INPUT: self, 存放單一因子指標的Dataframe, 切割成N等分
         OUTPUT: N個DF 每個代表當天每N分位的公司(Quantile 1 的因子值最大)，回傳tuple
@@ -785,7 +875,7 @@ class CustomDataFrame(pd.DataFrame):
         """
 
         # 計算每個日期的ROE排名
-        rank_df = self.rank(ascending=False, axis=1)
+        rank_df = self.rank(ascending=ascending, axis=1)
 
         # # 計算每個日期的分位數（根據公司數量和N來定義）
         # num_companies = len(self.columns)
@@ -805,10 +895,26 @@ class CustomDataFrame(pd.DataFrame):
             df.columns = self.columns
             df.index = self.index
 
-        # 使用tuple來存放不同分位的DataFrame
-        quantile_tuple = tuple(df for df in quantile_dfs)
+        # # 使用dict來存放不同分位的DataFrame
+        # list --> dict
+        result_dict = {}
+        for i, quantile_df in enumerate(quantile_dfs):
+            key = f'Quantile_{i + 1}'
+            result_dict[key] = quantile_df
+        return result_dict
 
 
-        return quantile_tuple
-       
+
+if __name__ == "__main__":
+    # 生成一個範例 DataFrame
+    # 生成 10x10 的隨機數據
+    np.random.seed(42)
+    data = np.random.randint(0, 100, size=(10, 10))
+
+    # 將數據轉換成 DataFrame
+    df = pd.DataFrame(data, columns=[f'Col{i+1}' for i in range(10)], index=[f'Row{j+1}' for j in range(10)])
+
+    df = CustomDataFrame(df)
+
+    r_list = df.divide_slice() 
 
