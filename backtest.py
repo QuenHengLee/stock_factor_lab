@@ -5,7 +5,7 @@ import report
 from plotly.subplots import make_subplots
 from get_data import Data
 
-def get_stock_data(position):
+def get_stock_data(position, data):
     '''
     根據position裡面的columns(股票代號)從DB中取得資料
     input:
@@ -15,8 +15,11 @@ def get_stock_data(position):
         stock_price : 每一天的股價
     '''
     # 實際收盤價資料
-    data = Data()
-    all_close = data.get("price:close")
+    if data:
+        all_close = data.get("price:close")
+    else:
+        data = Data()
+        all_close = data.get("price:close")
     all_close.index = pd.to_datetime(all_close.index, format="%Y-%m-%d")
     df_dict = {}
     for symbol, p in position.items():
@@ -38,6 +41,7 @@ def get_stock_data(position):
     stock_price = stock.asfreq("D", method="ffill")
     stock = stock.asfreq("D", method="ffill")
     stock = stock.loc[stock.index.isin(position.index)]
+
     return stock_price, stock
 
 def calc_weighted_positions(position, position_limit):
@@ -84,14 +88,14 @@ def position_resample(position, resample):
 
     return position
 
-def sim(position, resample='D', init_portfolio_value = 10**6,  position_limit=1, fee_ratio=1.425/1000, tax_ratio=3/1000):
+def sim(position, resample='D', init_portfolio_value = 10**6,  position_limit=1, fee_ratio=1.425/1000, tax_ratio=3/1000, data=None):
     # 初始金額
     # self.init_portfolio_value = init_portfolio_value
     position = position_resample(position, resample)
     position = calc_weighted_positions(position, position_limit)
 
     # 取得股價資料
-    stock_price, stock = get_stock_data(position)  
+    stock_price, stock = get_stock_data(position,data)  
     # # 取得有買進的訊號，只要任一股票有買進訊號，signal就會是True
     stock["signal"] = position.any(axis=1)
 
