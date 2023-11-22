@@ -4,7 +4,6 @@ import plotly.graph_objs as go
 import report
 from plotly.subplots import make_subplots
 from get_data import Data
-import time
 
 def get_stock_data(position, data):
     '''
@@ -15,7 +14,6 @@ def get_stock_data(position, data):
         stock : 根據position的index取得該日期的股價
         stock_price : 每一天的股價
     '''
-    start_time = time.time()
     # 實際收盤價資料
     if data:
         all_close = data.get("price:close")
@@ -43,9 +41,6 @@ def get_stock_data(position, data):
     stock_price = stock.asfreq("D", method="ffill")
     stock = stock.asfreq("D", method="ffill")
     stock = stock.loc[stock.index.isin(position.index)]
-
-    end_time = time.time()
-    print(f"get_stock_data() execution time: {end_time - start_time} seconds")
 
     return stock_price, stock
 
@@ -114,7 +109,6 @@ def sim(position, resample='D', init_portfolio_value = 10**6,  position_limit=1,
     shares_df = pd.DataFrame(0, index=position.index, columns=position.columns)
     prev_values = {}
 
-    start_time = time.time()
     first_trading = True
     for day in position.index:
         # 持有股票
@@ -182,7 +176,5 @@ def sim(position, resample='D', init_portfolio_value = 10**6,  position_limit=1,
     
     r = report.Report(stock_data, position)
 
-    end_time = time.time()
-    print(f"sim() execution time: {end_time - start_time} seconds")
     return r
 
