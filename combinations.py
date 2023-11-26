@@ -3,7 +3,7 @@ import pandas as pd
 
 # from finlab.backtest import sim
 
-from Backtest import Backtest
+from backtest import *
 from finlab.core.report import Report
 from finlab.utils import logger
 from dataframe import CustomDataFrame

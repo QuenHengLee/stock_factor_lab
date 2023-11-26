@@ -151,13 +151,13 @@ def adjust_index_of_report(df):
     # 遍歷原始 DataFrame 的索引
     for current_date in df.index:
         # 根據規則進行日期調整
-        if current_date.month == 3 and current_date.day == 31:
+        if current_date.month == 3:
             new_date = current_date.replace(month=5, day=15)
-        elif current_date.month == 6 and current_date.day == 30:
+        elif current_date.month == 6:
             new_date = current_date.replace(month=8, day=31)
-        elif current_date.month == 9 and current_date.day == 30:
+        elif current_date.month == 9:
             new_date = current_date.replace(month=11, day=15)
-        elif current_date.month == 12 and current_date.day == 30:
+        elif current_date.month == 12:
             new_date = (current_date + timedelta(days=90)).replace(day=31)
         else:
             # 如果日期不符合規則，保持不變
@@ -170,3 +170,6 @@ def adjust_index_of_report(df):
     df.index = new_index
 
     return df
+
+
+# if __name__ == "__main__":
