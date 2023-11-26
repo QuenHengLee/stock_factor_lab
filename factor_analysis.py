@@ -144,11 +144,11 @@ def factor_analysis_multi_ratio(factor_df_dict, factor_asc_dict, quantile=4):
 # 進行遮罩  5 MASK TRUE = 5,  3 MASK FALSE = NAN
 # Achieving Alpha雙因子會用到
 def MASK(df_bool, df_numeric):
-    # 使用np.where進行遮罩操作
+    # 使用 np.where 進行遮罩操作
     result = np.where(df_bool, df_numeric, np.nan)
 
-    # 將結果添加到新的DataFrame中
-    result_df = pd.DataFrame(result, columns=df_numeric.columns)
+    # 將結果添加到新的 DataFrame 中，並設定相同的日期索引
+    result_df = pd.DataFrame(result, columns=df_numeric.columns, index=df_numeric.index)
 
     return CustomDataFrame(result_df)
 
@@ -188,6 +188,8 @@ def factor_analysis_two_factor_AA(factor_df_dict, factor_asc_dict, quantile=4):
         key = f"{q}_MASK_factor2"
         value = MASK(df, factor_2_df)
         factor1_mask_factor2[key] = value
+
+    print(factor1_mask_factor2)
 
     result = {}
     print("因子:", factor_list)
@@ -269,33 +271,35 @@ def factor_analysis_single(factor_df_dict, factor_asc_dict, quantile=4):
 if __name__ == "__main__":
     # 生成 10x10 的隨機數據，其中大約 20% 的元素為 NaN
     np.random.seed(42)
-    data = np.random.randint(0, 1000, size=(100, 100)).astype(float)  # 將數據類型設為浮點型
+    data = np.random.randint(0, 1000, size=(100, 100)).astype(float)
     mask = np.random.choice([True, False], size=data.shape, p=[0.2, 0.8])
     data[mask] = np.nan
-    # 將數據轉換成 DataFrame
+    # 將數據轉換成 DataFrame，並使用日期範圍作為索引
     factor_1 = pd.DataFrame(
         data,
         columns=[f"Col{i+1}" for i in range(100)],
-        index=[f"Row{j+1}" for j in range(100)],
+        index=pd.date_range(start="2022-01-01", periods=100, freq="D"),
     )
+
     # 生成 10x10 的隨機數據，其中大約 20% 的元素為 NaN
     np.random.seed(98)
-    data = np.random.randint(0, 1000, size=(100, 100)).astype(float)  # 將數據類型設為浮點型
+    data = np.random.randint(0, 1000, size=(100, 100)).astype(float)
     mask = np.random.choice([True, False], size=data.shape, p=[0.2, 0.8])
     data[mask] = np.nan
-    # 將數據轉換成 DataFrame
+    # 將數據轉換成 DataFrame，並使用日期範圍作為索引
     factor_2 = pd.DataFrame(
         data,
         columns=[f"Col{i+1}" for i in range(100)],
-        index=[f"Row{j+1}" for j in range(100)],
+        index=pd.date_range(start="2022-01-01", periods=100, freq="D"),
     )
 
     # 示例使用方式
     factor_df_dict = {
-        "ROE": CustomDataFrame(pd.DataFrame(np.random.rand(100, 100))),
-        "PB": CustomDataFrame(pd.DataFrame(np.random.rand(100, 100))),
+        "ROE": CustomDataFrame(factor_1),
+        "PB": CustomDataFrame(factor_2),
         # 可以加入其他因子
     }
+
     factor_ratio_dict = {
         "ROE": 0.5,
         "PB": 0.5,
@@ -311,7 +315,7 @@ if __name__ == "__main__":
     # )
 
     # 呼叫Achieving Alpha的雙因子選股方法factor_analysis_two_factor_AA()
-    # result = factor_analysis_two_factor_AA(factor_df_dict, factor_asc_dict)
+    result = factor_analysis_two_factor_AA(factor_df_dict, factor_asc_dict)
 
-    # 呼叫直接兩因子做AND運算方法
-    result = factor_analysis_two_factor(factor_df_dict, factor_asc_dict)
+    # # 呼叫直接兩因子做AND運算方法
+    # result = factor_analysis_two_factor(factor_df_dict, factor_asc_dict)
