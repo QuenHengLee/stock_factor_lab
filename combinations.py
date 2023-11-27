@@ -79,3 +79,68 @@ class ReportCollection:
         fig.update_layout(title={'text': 'Cumulative returns', 'x': 0.49, 'y': 0.9, 'xanchor': 'center',
                                     'yanchor': 'top'})
         return fig
+    
+    def get_stats(self):
+        """取得策略指標比較表
+
+        指標欄位說明：
+
+        * `'daily_mean'`: 策略年化報酬
+        * `'daily_sharpe'`: 策略年化夏普率
+        * `'max_drawdown'`: 策略報酬率最大回撤率(負向)
+        * `'avg_drawdown'`: 策略平均回撤(負向)
+        * `'ytd'`: 今年度策略報酬率
+        * `'win_ratio'`: 每筆交易勝率
+
+        Returns:
+          (pd.DataFrame): 策略指標比較報表
+        """
+
+        def get_strategy_indicators(report):
+            if isinstance(report, Report):
+                stats = report.get_stats()
+                strategy_indexes = {n: stats[n] for n in
+                                    ['daily_mean', 'daily_sharpe',
+                                     'max_drawdown', 'avg_drawdown', 
+                                     'win_ratio', 'ytd']}
+                # trade_indexes.update(
+                #     {f'avg_{n}': trades[n].mean() for n in ['return', 'mae', 'bmfe', 'gmfe', 'mdd']})
+                # strategy_indexes.update(trade_indexes)
+                return strategy_indexes
+
+        df = pd.DataFrame({k: get_strategy_indicators(v) for k, v in self.reports.items()})
+        self.stats = df
+        return df
+
+    def plot_stats(self, mode='bar', heatmap_sort_by='avg_score', indicators=[]):
+        """策略指標比較報表視覺化
+
+        Args:
+          mode (str): 繪圖模式。`'bar'` - 指標分群棒狀圖。`'heatmap'` - 指標分級熱力圖。
+          heatmap_sort_by (str or list of str): heatmap 降冪排序的決定欄位
+          indicators (list): 要顯示的特定指標欄位，預設為將指標全部顯示
+
+        Returns:
+          (plotly.graph_objects.Figure): 長條圖
+          (pd.DataFrame): 熱力圖
+
+        """
+        if self.stats is None:
+            self.get_stats()
+        df = self.stats
+
+        if mode == 'bar':
+            import plotly.graph_objects as go
+            items = df.columns
+            fig = go.Figure(data=[go.Bar(x=df.index, y=df[item], name=item, meta=[item],
+                                         hovertemplate="%{meta}<br>%{label}<br>%{y}<extra></extra>") for item in items])
+            # Change the bar mode
+            fig.update_layout(title={'text': 'Backtest combinations stats', 'x': 0.49, 'y': 0.9, 'xanchor': 'center',
+                                     'yanchor': 'top'}, barmode='group')
+            return fig
+
+        elif mode == 'heatmap':
+            return df.rank(pct=True, axis=1).transpose().assign(avg_score=lambda d: d.mean(axis=1)).round(2).mul(
+                100).sort_values(heatmap_sort_by, ascending=False).style.set_caption(
+                "Backtest combinations heatmap").format('{:.1f}%').background_gradient(axis=None, vmin=0, vmax=100,
+                                                                                       cmap="plasma")
