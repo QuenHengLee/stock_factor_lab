@@ -263,3 +263,83 @@ class Report():
         annual_returns.index = annual_returns.index.year
 
         return round(annual_returns.T * 100, 1)
+    
+    def calc_sharpe(self, returns, rf=0.0, nperiods=None, annualize=True):
+        """
+        Calculates the `Sharpe ratio <https://www.investopedia.com/terms/s/sharperatio.asp>`_
+        (see `Sharpe vs. Sortino <https://www.investopedia.com/ask/answers/010815/what-difference-between-sharpe-ratio-and-sortino-ratio.asp>`_).
+        If rf is non-zero and a float, you must specify nperiods. In this case, rf is assumed
+        to be expressed in yearly (annualized) terms.
+        Args:
+            * returns (Series, DataFrame): Input return series
+            * rf (float, Series): `Risk-free rate <https://www.investopedia.com/terms/r/risk-freerate.asp>`_ expressed as a yearly (annualized) return or return series
+            * nperiods (int): Frequency of returns (252 for daily, 12 for monthly,
+                etc.)
+        """
+        # if type(rf) is float and rf != 0 and nperiods is None:
+        if isinstance(rf, float) and rf != 0 and nperiods is None:
+            raise Exception("Must provide nperiods if rf != 0")
+
+        er = to_excess_returns(returns, rf, nperiods=nperiods)
+        std = np.std(er, ddof=1)
+        res = np.divide(er.mean(), max(std, 0.000001))
+
+        if annualize:
+            if nperiods is None:
+                nperiods = 1
+            return res * np.sqrt(nperiods)
+        else:
+            return res
+    
+    def calc_ytd(self, daily_prices, yearly_prices):
+        return daily_prices.iloc[-1] / yearly_prices.iloc[-2] - 1
+
+    def get_stats(self):
+        # daily_returns
+        dr = self.stock_data['portfolio_returns']
+        # portfolio_value
+        pv = self.stock_data['portfolio_value']
+        # yearly_portfolio_value
+        yv = pv.resample('A').last()
+
+        stats = {}
+        # stats["daily_mean"] = dr.mean() * 252
+        stats["daily_mean"] = self.calc_cagr()
+        stats['daily_sharpe'] = self.calc_sharpe(dr, nperiods=252)
+        stats['max_drawdown'] = self.calc_dd().min()
+        stats['avg_drawdown'] = self.calc_dd().mean()
+        stats['win_ratio'] = self.calc_win_ratio()
+        stats['ytd'] = self.calc_ytd(pv, yv)
+
+        return stats
+    
+def deannualize(returns, nperiods):
+    """
+    Convert return expressed in annual terms on a different basis.
+    Args:
+        * returns (float, Series, DataFrame): Return(s)
+        * nperiods (int): Target basis, typically 252 for daily, 12 for
+            monthly, etc.
+    """
+    return np.power(1 + returns, 1.0 / nperiods) - 1.0
+
+
+def to_excess_returns(returns, rf, nperiods=None):
+    """
+    Given a series of returns, it will return the excess returns over rf.
+    Args:
+        * returns (Series, DataFrame): Returns
+        * rf (float, Series): `Risk-Free rate(s) <https://www.investopedia.com/terms/r/risk-freerate.asp>`_ expressed in annualized term or return series
+        * nperiods (int): Optional. If provided, will convert rf to different
+            frequency using deannualize only if rf is a float
+    Returns:
+        * excess_returns (Series, DataFrame): Returns - rf
+    """
+    # if type(rf) is float and nperiods is not None:
+    if isinstance(rf, float) and nperiods is not None:
+
+        _rf = deannualize(rf, nperiods)
+    else:
+        _rf = rf
+
+    return returns - _rf
