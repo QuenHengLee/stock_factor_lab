@@ -2,7 +2,8 @@
 # 這些function是將原始DB TABLE的資料轉成get() api可用格式
 
 import pandas as pd
-from dataframe import CustomDataFrame 
+from dataframe import CustomDataFrame
+from datetime import datetime, timedelta
 
 # Abstract API：
 from talib import abstract
@@ -138,3 +139,37 @@ def get_number_of_indicator_return(indname, tmp_company_daily_price):
         # 直接將該回傳值作為單一元素回傳
         # print("回傳數量: ",1)
         return 1
+
+
+def adjust_index_of_report(df):
+    # 將日期字符串轉換為 datetime 對象
+    df.index = pd.to_datetime(df.index)
+
+    # 創建一個新的索引列表
+    new_index = []
+
+    # 遍歷原始 DataFrame 的索引
+    for current_date in df.index:
+        # 根據規則進行日期調整
+        if current_date.month == 3:
+            new_date = current_date.replace(month=5, day=15)
+        elif current_date.month == 6:
+            new_date = current_date.replace(month=8, day=31)
+        elif current_date.month == 9:
+            new_date = current_date.replace(month=11, day=15)
+        elif current_date.month == 12:
+            new_date = (current_date + timedelta(days=90)).replace(day=31)
+        else:
+            # 如果日期不符合規則，保持不變
+            new_date = current_date
+
+        # 將新日期添加到新索引列表
+        new_index.append(new_date)
+
+    # 將新索引設置為 DataFrame 的索引
+    df.index = new_index
+
+    return df
+
+
+# if __name__ == "__main__":

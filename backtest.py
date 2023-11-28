@@ -177,4 +177,3 @@ def sim(position, resample='D', init_portfolio_value = 10**6,  position_limit=1,
     r = report.Report(stock_data, position)
 
     return r
-
