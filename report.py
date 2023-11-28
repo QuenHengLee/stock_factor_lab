@@ -13,14 +13,30 @@ def sort_month(df):
     return df[month_order]
 
 class Report():
-    def __init__(self, stock_data) -> None:
+    def __init__(self, stock_data, position) -> None:
         self.stock_data = stock_data
+        self.position = position
 
     def display(self):
         from IPython.display import display
+        
+        # 計算
+        fig = self.create_performance_figure(self.position)
+
+        imp_stats = pd.Series({
+         'annualized_rate_of_return':str(round(self.calc_cagr()*100, 2))+'%',
+         'sharpe': str(0),
+         'max_drawdown':str(round(self.calc_dd().min()*100, 2))+'%',
+         'win_ratio':str(round(self.calc_win_ratio()*100, 2))+'%',
+        }).to_frame().T
+        imp_stats.index = ['']
+
         yearly_return_fig = self.create_yearly_return_figure()
         monthly_return_fig = self.create_monthly_return_figure()
 
+        # show出來
+        display(imp_stats)
+        display(fig)
         display(yearly_return_fig)
         display(monthly_return_fig)
     
@@ -100,8 +116,77 @@ class Report():
 
         return fig
 
+    def create_performance_figure(self, position):
 
-    def calc_mdd(self):
+        from plotly.subplots import make_subplots
+        import plotly.graph_objs as go
+        # plot performance
+
+        def diff(s, period):
+            return (s / s.shift(period) - 1)
+
+        drawdowns = self.calc_dd()
+        performance_detail = self.stock_data.replace([0],np.nan).dropna()
+        position = position.loc[position.index.isin(performance_detail.index)]
+        nstocks = (position != 0).sum(axis=1)
+
+        fig = go.Figure(make_subplots(
+            rows=4, cols=1, shared_xaxes=True, row_heights=[2, 1, 1, 1]))
+        fig.add_scatter(x=performance_detail.index, y=round(performance_detail['cum_returns'], 2),
+                        name='strategy', row=1, col=1, legendgroup='performance', fill='tozeroy')
+        fig.add_scatter(x=drawdowns.index, y=drawdowns, name='strategy - drawdown',
+                        row=2, col=1, legendgroup='drawdown', fill='tozeroy')
+        fig.add_scatter(x=performance_detail.index, y=diff(performance_detail['portfolio_value'], 20),
+                        fill='tozeroy', name='strategy - month rolling return',
+                        row=3, col=1, legendgroup='rolling performance', )
+        fig.add_scatter(x=nstocks.index, y=nstocks, row=4,
+                        col=1, name='nstocks', fill='tozeroy')
+
+        fig.update_layout(legend={'bgcolor': 'rgba(0,0,0,0)'},
+                          margin=dict(l=60, r=20, t=40, b=20),
+                          height=600,
+                          width=800,
+                          xaxis4=dict(
+                              rangeselector=dict(
+                                  buttons=list([
+                                      dict(count=1,
+                                           label="1m",
+                                           step="month",
+                                           stepmode="backward"),
+                                      dict(count=6,
+                                           label="6m",
+                                           step="month",
+                                           stepmode="backward"),
+                                      dict(count=1,
+                                           label="YTD",
+                                           step="year",
+                                           stepmode="todate"),
+                                      dict(count=1,
+                                           label="1y",
+                                           step="year",
+                                           stepmode="backward"),
+                                      dict(step="all")
+                                  ]),
+                                  x=0,
+                                  y=1,
+                              ),
+                              rangeslider={'visible': True, 'thickness': 0.1},
+                              type="date",
+                          ),
+                          yaxis={'tickformat': ',.0%', },
+                          yaxis2={'tickformat': ',.0%', },
+                          yaxis3={'tickformat': ',.0%', },
+                          )
+        return fig
+
+    def calc_win_ratio(self):
+        '''
+        計算勝率是看每天報酬>0的天數/總天數
+        '''
+        trades = self.stock_data.replace([0],np.nan).dropna()
+        return sum(trades['portfolio_returns'] > 0) / len(trades) if len(trades) != 0 else 0
+
+    def calc_dd(self):
         '''
         計算Drawdown的方式是找出截至當下的最大累計報酬(%)除以當下的累計報酬
         所以用累計報酬/累計報酬.cummax()
@@ -113,14 +198,14 @@ class Report():
             end : mdd結束日期
             days : 持續時間
         '''
-        r = self.stock_data['cum_returns']
+        r = self.stock_data['cum_returns'].replace([1],np.nan).dropna()
         dd = r.div(r.cummax()).sub(1)
         mdd = dd.min()
-        end = dd.idxmin()
-        start = r.loc[:end].idxmax()
-        days = end-start
+        # end = dd.idxmin()
+        # start = r.loc[:end].idxmax()
+        # days = end-start
 
-        return dd, mdd, start, end, days
+        return dd
 
     def calc_cagr(self):
         '''
@@ -178,3 +263,83 @@ class Report():
         annual_returns.index = annual_returns.index.year
 
         return round(annual_returns.T * 100, 1)
+    
+    def calc_sharpe(self, returns, rf=0.0, nperiods=None, annualize=True):
+        """
+        Calculates the `Sharpe ratio <https://www.investopedia.com/terms/s/sharperatio.asp>`_
+        (see `Sharpe vs. Sortino <https://www.investopedia.com/ask/answers/010815/what-difference-between-sharpe-ratio-and-sortino-ratio.asp>`_).
+        If rf is non-zero and a float, you must specify nperiods. In this case, rf is assumed
+        to be expressed in yearly (annualized) terms.
+        Args:
+            * returns (Series, DataFrame): Input return series
+            * rf (float, Series): `Risk-free rate <https://www.investopedia.com/terms/r/risk-freerate.asp>`_ expressed as a yearly (annualized) return or return series
+            * nperiods (int): Frequency of returns (252 for daily, 12 for monthly,
+                etc.)
+        """
+        # if type(rf) is float and rf != 0 and nperiods is None:
+        if isinstance(rf, float) and rf != 0 and nperiods is None:
+            raise Exception("Must provide nperiods if rf != 0")
+
+        er = to_excess_returns(returns, rf, nperiods=nperiods)
+        std = np.std(er, ddof=1)
+        res = np.divide(er.mean(), max(std, 0.000001))
+
+        if annualize:
+            if nperiods is None:
+                nperiods = 1
+            return res * np.sqrt(nperiods)
+        else:
+            return res
+    
+    def calc_ytd(self, daily_prices, yearly_prices):
+        return daily_prices.iloc[-1] / yearly_prices.iloc[-2] - 1
+
+    def get_stats(self):
+        # daily_returns
+        dr = self.stock_data['portfolio_returns']
+        # portfolio_value
+        pv = self.stock_data['portfolio_value']
+        # yearly_portfolio_value
+        yv = pv.resample('A').last()
+
+        stats = {}
+        # stats["daily_mean"] = dr.mean() * 252
+        stats["daily_mean"] = self.calc_cagr()
+        stats['daily_sharpe'] = self.calc_sharpe(dr, nperiods=252)
+        stats['max_drawdown'] = self.calc_dd().min()
+        stats['avg_drawdown'] = self.calc_dd().mean()
+        stats['win_ratio'] = self.calc_win_ratio()
+        stats['ytd'] = self.calc_ytd(pv, yv)
+
+        return stats
+    
+def deannualize(returns, nperiods):
+    """
+    Convert return expressed in annual terms on a different basis.
+    Args:
+        * returns (float, Series, DataFrame): Return(s)
+        * nperiods (int): Target basis, typically 252 for daily, 12 for
+            monthly, etc.
+    """
+    return np.power(1 + returns, 1.0 / nperiods) - 1.0
+
+
+def to_excess_returns(returns, rf, nperiods=None):
+    """
+    Given a series of returns, it will return the excess returns over rf.
+    Args:
+        * returns (Series, DataFrame): Returns
+        * rf (float, Series): `Risk-Free rate(s) <https://www.investopedia.com/terms/r/risk-freerate.asp>`_ expressed in annualized term or return series
+        * nperiods (int): Optional. If provided, will convert rf to different
+            frequency using deannualize only if rf is a float
+    Returns:
+        * excess_returns (Series, DataFrame): Returns - rf
+    """
+    # if type(rf) is float and nperiods is not None:
+    if isinstance(rf, float) and nperiods is not None:
+
+        _rf = deannualize(rf, nperiods)
+    else:
+        _rf = rf
+
+    return returns - _rf
