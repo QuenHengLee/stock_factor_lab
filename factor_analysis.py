@@ -189,16 +189,17 @@ def factor_analysis_two_factor_AA(factor_df_dict, factor_asc_dict, quantile=4):
         value = MASK(df, factor_2_df)
         factor1_mask_factor2[key] = value
 
-    print(factor1_mask_factor2)
+    # print(factor1_mask_factor2)
 
     result = {}
-    print("因子:", factor_list)
+    # print("因子:", factor_list)
     for i in range(quantile):
-        key = f"Qunatile{i+1}_{factor_1}_{factor_2}"
+        # key = f"Quantile{i+1}_{factor_1}_{factor_2}"
+        key = f"Quantile_{i+1}"
         tmp_str = "Quantile_" + str(i + 1) + "_MASK_factor2"
         tmp_list = factor1_mask_factor2[tmp_str].divide_slice(quantile, factor_2_asc)
         result[key] = tmp_list["Quantile_" + str(i + 1)]
-
+    print(result)
     return result
 
 
@@ -233,7 +234,8 @@ def factor_analysis_two_factor(factor_df_dict, factor_asc_dict, quantile=4):
     # print(factor_1_after_slice)
     result = {}
     for i in range(quantile):
-        key = f"Qunatile{i+1}_{factor_1}_{factor_2}"
+        # key = f"Quantile{i+1}_{factor_1}_{factor_2}"
+        key = f"Quantile_{i+1}"
         value = (
             factor_1_after_slice["Quantile_" + str(i + 1)]
             & factor_2_after_slice["Quantile_" + str(i + 1)]
