@@ -6,6 +6,8 @@ import pandas as pd
 from dataframe import CustomDataFrame
 import pandas as pd
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 def cal_interpolated_of_df(df, ascending=False):
@@ -51,8 +53,8 @@ def cal_factor_sum_df_interpolated(
         最後根據因子切割的大小quantile，回傳該權重的position
     """
     # 確保輸入的因子數量和比重數量相等
-    if len(factor_df_dict) != len(factor_ratio_dict):
-        raise ValueError("因子數量和比重數量不相等")
+    # if len(factor_df_dict) != len(factor_ratio_dict):
+    #     raise ValueError("因子數量和比重數量不相等")
 
     # 計算因子DF的內插值
     factor_df_interpolated = {
@@ -199,7 +201,7 @@ def factor_analysis_two_factor_AA(factor_df_dict, factor_asc_dict, quantile=4):
         tmp_str = "Quantile_" + str(i + 1) + "_MASK_factor2"
         tmp_list = factor1_mask_factor2[tmp_str].divide_slice(quantile, factor_2_asc)
         result[key] = tmp_list["Quantile_" + str(i + 1)]
-    print(result)
+    # print(result)
     return result
 
 
@@ -268,6 +270,58 @@ def factor_analysis_single(factor_df_dict, factor_asc_dict, quantile=4):
         return factor_value_df.divide_slice(quantile, factor_asc)
     else:
         print("該方法為單因子切割，請勿帶入超過一個因子")
+
+
+# 比較三種不同方法雙因子的api
+def sim_3_diff_method(
+    factor_df_dict, factor_ratio_dict, factor_asc_dict, data, quantile=4, quantile_th=1
+):
+    """
+    INPUTS:
+        factor_df_dict: 目標因子的df
+        factor_ratio_dict:
+        factor_asc_dict: 決定因子是越大(F)/小(T)越好, 因子的排序方向
+        data: 決定因子是越大(F)/小(T)越好, 因子的排序方向
+        quantile: 決定因子是越大(F)/小(T)越好, 因子的排序方向
+        quantile_th
+    RETURN:
+        interpolated_df: 計算完因子內插值後的dataframe
+
+    FUNCTION:
+        以ROW為基準，計算每一ROW的內插值，最大1最小0
+    """
+    # 執行因子分析
+    result_AA = factor_analysis_two_factor_AA(factor_df_dict, factor_asc_dict, quantile)
+    result_INTERPOLATED = cal_factor_sum_df_interpolated(
+        factor_df_dict, factor_ratio_dict, factor_asc_dict, quantile
+    )
+    result_AND = factor_analysis_two_factor(factor_df_dict, factor_asc_dict, quantile)
+    # 選取第幾分位
+    quantile_th = "Quantile_" + str(quantile_th)
+    postion_AA = result_AA[quantile_th]
+    postion_INTERPOLATED = result_INTERPOLATED[quantile_th]
+    postion_AND = result_AND[quantile_th]
+    # 執行回測
+    sim_result_AA = sim(postion_AA, resample="Q", data=data)
+    sim_result_INTERPOLATED = sim(postion_INTERPOLATED, resample="Q", data=data)
+    sim_result_AND = sim(postion_AND, resample="Q", data=data)
+    # 畫圖
+    # 創建一個圖表和子圖
+    fig, ax = plt.subplots()
+
+    # 在第一個子圖中繪製第一個 DataFrame 的 "cum_returns" 列
+    sim_result_AA.stock_data["cum_returns"].plot(ax=ax, label="aa_method_result")
+    # 在第一個子圖中繪製第二個 DataFrame 的 "cum_returns" 列
+    sim_result_INTERPOLATED.stock_data["cum_returns"].plot(
+        ax=ax, label="interpolated_method_result"
+    )
+    # 在第一個子圖中繪製第四個 DataFrame 的 "cum_returns" 列
+    sim_result_AND.stock_data["cum_returns"].plot(ax=ax, label="and_method_result")
+    # 添加圖例
+    ax.legend()
+
+    # 顯示圖表
+    plt.show()
 
 
 if __name__ == "__main__":
