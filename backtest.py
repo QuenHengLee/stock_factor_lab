@@ -35,6 +35,7 @@ def get_stock_data(position, data):
         axis=1,
         keys=position.columns.tolist(),
     )
+    # stock = pd.read_csv('../Data/Finlab/stock.csv').set_index('date')
     # 讓日期格式一致
     stock.index = pd.to_datetime(stock.index, format="%Y-%m-%d")
     stock.ffill(inplace=True)
