@@ -115,29 +115,20 @@ class Data:
         if subject == "price":
             # 呼叫處理開高低收的FUNCT
             price_data = self.all_price_dict[item]
+            # 處理價量資料缺漏植問題: ffill
+            price_data.fillna(method="ffill", inplace=True)
             return price_data
         elif subject == "report":
             # 財報資料的Header為大寫
             item = item.upper().replace(" ", "")
             report_data = self.format_report_data(item)
+            # 財報資料日期調整
+            adjusted_report_data = adjust_index_of_report(report_data)
+            # 處理財報資料缺漏植問題: ffill
+            adjusted_report_data.fillna(method="ffill", inplace=True)
             # return report_data
-            return adjust_index_of_report(report_data)
+            return adjusted_report_data
 
-        # elif subject == "report":
-        #     # 財報資料的Header為大寫
-        #     item = item.upper().replace(" ", "")
-        #     # 可能會有多個財報資料，以逗號加空格為分隔符
-        #     # 將字串以逗號加空格為分隔符，分割成元素列表
-        #     elements = item.split(",")
-        #     # 創建一個以元素為鍵，空字串為值的字典
-        #     element_dict = {element: "" for element in elements}
-        #     # 使用迴圈遍歷字典的鍵值對
-        #     for key, value in element_dict.items():
-        #         # 呼叫處理財報的FUNCT
-        #         element_dict[key] = self.format_report_data(key)
-
-        #     # 有多個財報資料時，回傳一個字典
-        #     return element_dict
         else:
             print("目前資料來源有price、report")
 
