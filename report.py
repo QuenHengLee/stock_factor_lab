@@ -304,7 +304,7 @@ class Report():
 
         stats = {}
         # stats["daily_mean"] = dr.mean() * 252
-        stats["daily_mean"] = self.calc_cagr()
+        stats["CAGR"] = self.calc_cagr()
         stats['daily_sharpe'] = self.calc_sharpe(dr, nperiods=252)
         stats['max_drawdown'] = self.calc_dd().min()
         stats['avg_drawdown'] = self.calc_dd().mean()
