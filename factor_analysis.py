@@ -38,7 +38,11 @@ def cal_interpolated_of_df(df, ascending=False):
 
 
 def cal_factor_sum_df_interpolated(
-    factor_df_dict, factor_ratio_dict, factor_asc_dict, quantile=4
+    factor_name_list,
+    factor_ratio_dict,
+    factor_asc_dict,
+    quantile=4,
+    all_factor_df_dict=None,
 ):
     """
     INPUTS:
@@ -52,9 +56,22 @@ def cal_factor_sum_df_interpolated(
         計算多個因子內插值的加權總分，如果有任一因子為nan，其他因子不為nan，則加總也是nan
         最後根據因子切割的大小quantile，回傳該權重的position
     """
-    # 確保輸入的因子數量和比重數量相等
-    # if len(factor_df_dict) != len(factor_ratio_dict):
-    #     raise ValueError("因子數量和比重數量不相等")
+    # 取得個因子名稱
+    factor_1 = factor_name_list[0]
+    factor_2 = factor_name_list[1]
+    factor_df_dict = {}
+    # 判斷雙因子是否相同
+    if factor_1 == factor_2:
+        factor_df_dict[factor_1] = all_factor_df_dict[factor_1]
+        # 將第二個因子KEY值做出名稱差異
+        factor_2 = factor_2 + "'"
+        factor_df_dict[factor_2] = all_factor_df_dict[factor_1]
+        # 比重、排序也要加上第二個重複因子的值\
+        factor_ratio_dict[factor_2] = factor_ratio_dict[factor_1]
+        factor_asc_dict[factor_2] = factor_asc_dict[factor_1]
+    else:
+        factor_df_dict[factor_1] = all_factor_df_dict[factor_1]
+        factor_df_dict[factor_2] = all_factor_df_dict[factor_2]
 
     # 計算因子DF的內插值
     factor_df_interpolated = {
@@ -155,10 +172,12 @@ def MASK(df_bool, df_numeric):
     return CustomDataFrame(result_df)
 
 
-def factor_analysis_two_factor_AA(factor_df_dict, factor_asc_dict, quantile=4):
+def factor_analysis_two_factor_AA(
+    factor_name_list, factor_asc_dict, quantile=4, all_factor_df_dict=None
+):
     """
     INPUTS:
-        factor_df_dict: 一個字典，包含多個因子的dataframe，以因子名稱為鍵，對應的dataframe為值
+        factor_name_list: 一個字典，包含多個因子的名稱，例如: factor_name_list = ['roe','pb']
         factor_ratio_dict: 一個字典，包含多個因子的比重，以因子名稱為鍵，對應的比重為值
         quantile: 打算將因子切割成幾等分
     RETURN:
@@ -167,17 +186,12 @@ def factor_analysis_two_factor_AA(factor_df_dict, factor_asc_dict, quantile=4):
         實現Achieving Alpha的雙因子選股方法，強調第一個因子，弱化第二個因子
 
     """
-    # 取得因子的list
-    # 取得所有的鍵
-    keys = factor_df_dict.keys()
-    # 將鍵轉換為列表（可選）
-    factor_list = list(keys)
     # 取得個因子名稱
-    factor_1 = factor_list[0]
-    factor_2 = factor_list[1]
+    factor_1 = factor_name_list[0]
+    factor_2 = factor_name_list[1]
     # 從Input擷取個因子的DF
-    factor_1_df = factor_df_dict[factor_1]
-    factor_2_df = factor_df_dict[factor_2]
+    factor_1_df = all_factor_df_dict[factor_1]
+    factor_2_df = all_factor_df_dict[factor_2]
     # 從Input擷取個因子的排序方向
     factor_1_asc = factor_asc_dict[factor_1]
     factor_2_asc = factor_asc_dict[factor_2]
@@ -205,7 +219,9 @@ def factor_analysis_two_factor_AA(factor_df_dict, factor_asc_dict, quantile=4):
     return result
 
 
-def factor_analysis_two_factor(factor_df_dict, factor_asc_dict, quantile=4):
+def factor_analysis_two_factor(
+    factor_name_list, factor_asc_dict, quantile=4, all_factor_df_dict=None
+):
     """
     INPUTS:
         factor_df_dict: 一個字典，包含多個因子的dataframe，以因子名稱為鍵，對應的dataframe為值
@@ -216,17 +232,15 @@ def factor_analysis_two_factor(factor_df_dict, factor_asc_dict, quantile=4):
     FUNCTION:
         將兩個因子DF經divide_slice後，根據Quantile 執行AND運算
     """
-    # 取得因子的list
-    # 取得所有的鍵
-    keys = factor_df_dict.keys()
-    # 將鍵轉換為列表（可選）
-    factor_list = list(keys)
     # 取得個因子名稱
-    factor_1 = factor_list[0]
-    factor_2 = factor_list[1]
+    factor_1 = factor_name_list[0]
+    factor_2 = factor_name_list[1]
     # 從Input擷取個因子的DF
-    factor_1_df = factor_df_dict[factor_1]
-    factor_2_df = factor_df_dict[factor_2]
+    factor_1_df = all_factor_df_dict[factor_1]
+    factor_2_df = all_factor_df_dict[factor_2]
+    # # 從Input擷取個因子的DF
+    # factor_1_df = factor_df_dict[factor_1]
+    # factor_2_df = factor_df_dict[factor_2]
     # 從Input擷取個因子的排序方向
     factor_1_asc = factor_asc_dict[factor_1]
     factor_2_asc = factor_asc_dict[factor_2]
@@ -273,55 +287,66 @@ def factor_analysis_single(factor_df_dict, factor_asc_dict, quantile=4):
 
 
 # 比較三種不同方法雙因子的api
-def sim_3_diff_method(
-    factor_df_dict, factor_ratio_dict, factor_asc_dict, data, quantile=4, quantile_th=1
-):
-    """
-    INPUTS:
-        factor_df_dict: 目標因子的df
-        factor_ratio_dict:
-        factor_asc_dict: 決定因子是越大(F)/小(T)越好, 因子的排序方向
-        data: 決定因子是越大(F)/小(T)越好, 因子的排序方向
-        quantile: 決定因子是越大(F)/小(T)越好, 因子的排序方向
-        quantile_th
-    RETURN:
-        interpolated_df: 計算完因子內插值後的dataframe
+# def sim_3_diff_method(
+#     factor_df_dict,
+#     factor_ratio_dict,
+#     factor_asc_dict,
+#     data,
+#     quantile=4,
+#     quantile_th=1,
+#     all_factor_df_dict=None,
+# ):
+#     """
+#     INPUTS:
+#         factor_df_dict: 目標因子的df
+#         factor_ratio_dict:
+#         factor_asc_dict: 決定因子是越大(F)/小(T)越好, 因子的排序方向
+#         data: 決定因子是越大(F)/小(T)越好, 因子的排序方向
+#         quantile: 決定因子是越大(F)/小(T)越好, 因子的排序方向
+#         quantile_th
+#         all_factor_df_dict: dictionary中預先存放所有因子資料的DF集合，以便這輪需用到
+#     RETURN:
+#         interpolated_df: 計算完因子內插值後的dataframe
 
-    FUNCTION:
-        以ROW為基準，計算每一ROW的內插值，最大1最小0
-    """
-    # 執行因子分析
-    result_AA = factor_analysis_two_factor_AA(factor_df_dict, factor_asc_dict, quantile)
-    result_INTERPOLATED = cal_factor_sum_df_interpolated(
-        factor_df_dict, factor_ratio_dict, factor_asc_dict, quantile
-    )
-    result_AND = factor_analysis_two_factor(factor_df_dict, factor_asc_dict, quantile)
-    # 選取第幾分位
-    quantile_th = "Quantile_" + str(quantile_th)
-    postion_AA = result_AA[quantile_th]
-    postion_INTERPOLATED = result_INTERPOLATED[quantile_th]
-    postion_AND = result_AND[quantile_th]
-    # 執行回測
-    sim_result_AA = sim(postion_AA, resample="Q", data=data)
-    sim_result_INTERPOLATED = sim(postion_INTERPOLATED, resample="Q", data=data)
-    sim_result_AND = sim(postion_AND, resample="Q", data=data)
-    # 畫圖
-    # 創建一個圖表和子圖
-    fig, ax = plt.subplots()
+#     FUNCTION:
+#         以ROW為基準，計算每一ROW的內插值，最大1最小0
+#     """
+#     # 執行因子分析
+#     result_AA = factor_analysis_two_factor_AA(
+#         factor_df_dict, factor_asc_dict, quantile, all_factor_df_dict
+#     )
+#     result_INTERPOLATED = cal_factor_sum_df_interpolated(
+#         factor_df_dict, factor_ratio_dict, factor_asc_dict, quantile, all_factor_df_dict
+#     )
+#     result_AND = factor_analysis_two_factor(
+#         factor_df_dict, factor_asc_dict, quantile, all_factor_df_dict
+#     )
+#     # 選取第幾分位
+#     quantile_th = "Quantile_" + str(quantile_th)
+#     postion_AA = result_AA[quantile_th]
+#     postion_INTERPOLATED = result_INTERPOLATED[quantile_th]
+#     postion_AND = result_AND[quantile_th]
+#     # 執行回測
+#     sim_result_AA = sim(postion_AA, resample="Q", data=data)
+#     sim_result_INTERPOLATED = sim(postion_INTERPOLATED, resample="Q", data=data)
+#     sim_result_AND = sim(postion_AND, resample="Q", data=data)
+#     # 畫圖
+#     # 創建一個圖表和子圖
+#     fig, ax = plt.subplots()
 
-    # 在第一個子圖中繪製第一個 DataFrame 的 "cum_returns" 列
-    sim_result_AA.stock_data["cum_returns"].plot(ax=ax, label="aa_method_result")
-    # 在第一個子圖中繪製第二個 DataFrame 的 "cum_returns" 列
-    sim_result_INTERPOLATED.stock_data["cum_returns"].plot(
-        ax=ax, label="interpolated_method_result"
-    )
-    # 在第一個子圖中繪製第四個 DataFrame 的 "cum_returns" 列
-    sim_result_AND.stock_data["cum_returns"].plot(ax=ax, label="and_method_result")
-    # 添加圖例
-    ax.legend()
+#     # 在第一個子圖中繪製第一個 DataFrame 的 "cum_returns" 列
+#     sim_result_AA.stock_data["cum_returns"].plot(ax=ax, label="aa_method_result")
+#     # 在第一個子圖中繪製第二個 DataFrame 的 "cum_returns" 列
+#     sim_result_INTERPOLATED.stock_data["cum_returns"].plot(
+#         ax=ax, label="interpolated_method_result"
+#     )
+#     # 在第一個子圖中繪製第四個 DataFrame 的 "cum_returns" 列
+#     sim_result_AND.stock_data["cum_returns"].plot(ax=ax, label="and_method_result")
+#     # 添加圖例
+#     ax.legend()
 
-    # 顯示圖表
-    plt.show()
+#     # 顯示圖表
+#     plt.show()
 
 
 if __name__ == "__main__":
