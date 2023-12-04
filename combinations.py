@@ -140,7 +140,4 @@ class ReportCollection:
             return fig
 
         elif mode == 'heatmap':
-            return df.rank(pct=True, axis=1).transpose().assign(avg_score=lambda d: d.mean(axis=1)).round(2).mul(
-                100).sort_values(heatmap_sort_by, ascending=False).style.set_caption(
-                "Backtest combinations heatmap").format('{:.1f}%').background_gradient(axis=None, vmin=0, vmax=100,
-                                                                                       cmap="plasma")
+            return df.T.sort_values('CAGR', ascending=False).style.set_caption("Backtest combinations heatmap").background_gradient(axis=0, cmap="YlGn")
