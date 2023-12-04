@@ -3,6 +3,7 @@ import pandas as pd
 from backtest import sim
 from report import Report
 from dataframe import CustomDataFrame
+from tqdm import tqdm
 
 def sim_conditions(conditions, combination=False, *args, **kwargs):
     """取得回測報告集合
@@ -21,25 +22,9 @@ def sim_conditions(conditions, combination=False, *args, **kwargs):
 
     """
 
-    key_dataset = []
-    conditions.pop('__builtins__', None)
-    new_conditions = {}
-    for k, v in conditions.items():
-        v = CustomDataFrame(v)
-        new_conditions[k] = v
-    if combination:
-        for i in range(1, len(new_conditions) + 1):
-            key_dataset.extend(list(combinations(new_conditions.keys(), i)))
-        conditions_combinations = [' & '.join(k) for k in key_dataset]
-    else:
-        key_dataset.extend(list(new_conditions.keys()))
-        conditions_combinations = key_dataset
-
     reports = {}
-    for k in conditions_combinations:
-        position = eval(k, new_conditions)
-
-        reports[k] = sim(position, *args, **kwargs)
+    for k, v in tqdm(conditions.items(), desc="Backtesting progress", unit="condition"):
+        reports[k] = sim(v, *args, **kwargs)
 
     return ReportCollection(reports)
 
@@ -54,7 +39,7 @@ class ReportCollection:
           reports (dict): 回測物件集合，ex:`{'strategy1': finlab.backtest.sim(),'strategy2': finlab.backtest.sim()}`
         """
         self.reports = reports
-        self.stats = None
+        self.stats = self.get_stats()
 
     def plot_creturns(self):
         """繪製策略累積報酬率
