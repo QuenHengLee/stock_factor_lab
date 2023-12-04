@@ -85,7 +85,7 @@ class ReportCollection:
 
         指標欄位說明：
 
-        * `'daily_mean'`: 策略年化報酬
+        * `'CAGR'`: 策略年化報酬
         * `'daily_sharpe'`: 策略年化夏普率
         * `'max_drawdown'`: 策略報酬率最大回撤率(負向)
         * `'avg_drawdown'`: 策略平均回撤(負向)
@@ -100,7 +100,7 @@ class ReportCollection:
             if isinstance(report, Report):
                 stats = report.get_stats()
                 strategy_indexes = {n: stats[n] for n in
-                                    ['daily_mean', 'daily_sharpe',
+                                    ['CAGR', 'daily_sharpe',
                                      'max_drawdown', 'avg_drawdown', 
                                      'win_ratio', 'ytd']}
                 # trade_indexes.update(
