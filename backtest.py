@@ -35,6 +35,7 @@ def get_stock_data(position, data):
         axis=1,
         keys=position.columns.tolist(),
     )
+    # stock = pd.read_csv('../Data/Finlab/stock.csv').set_index('date')
     # 讓日期格式一致
     stock.index = pd.to_datetime(stock.index, format="%Y-%m-%d")
     stock.ffill(inplace=True)
@@ -173,6 +174,10 @@ def sim(position, resample='D', init_portfolio_value = 10**6,  position_limit=1,
 
     # 累計報酬
     stock_data['cum_returns'] = stock_data['portfolio_returns'].add(1).cumprod()
+
+    # 每日入選股票數量
+    stock_data['company_count'] = (position != 0).sum(axis=1)
+    stock_data['company_count'] = stock_data['company_count'].fillna(method='ffill')
     
     r = report.Report(stock_data, position)
 

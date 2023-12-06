@@ -25,7 +25,7 @@ class Report():
 
         imp_stats = pd.Series({
          'annualized_rate_of_return':str(round(self.calc_cagr()*100, 2))+'%',
-         'sharpe': str(0),
+         'sharpe': str(self.calc_sharpe(self.stock_data['portfolio_returns'], nperiods=252)),
          'max_drawdown':str(round(self.calc_dd().min()*100, 2))+'%',
          'win_ratio':str(round(self.calc_win_ratio()*100, 2))+'%',
         }).to_frame().T
@@ -304,7 +304,7 @@ class Report():
 
         stats = {}
         # stats["daily_mean"] = dr.mean() * 252
-        stats["daily_mean"] = self.calc_cagr()
+        stats["CAGR"] = self.calc_cagr()
         stats['daily_sharpe'] = self.calc_sharpe(dr, nperiods=252)
         stats['max_drawdown'] = self.calc_dd().min()
         stats['avg_drawdown'] = self.calc_dd().mean()
