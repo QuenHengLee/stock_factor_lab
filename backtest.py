@@ -116,18 +116,24 @@ def sim(position, resample='D', init_portfolio_value = 10**6,  position_limit=1,
         if stock.loc[day]['signal'] == False:
             if day == stock.index[0]:
                 # 第一天直接取shares_df裡的值 (全部都0)
-                prev_values = shares_df.loc[day].to_dict()
+                # prev_values = shares_df.loc[day].to_dict()
 
                 assets.loc[day, "portfolio_value"] = 0
                 assets.loc[day, "cost"] = 0
                 assets.loc[day, "remain"] =  0
 
-            else:   # 剩下的取前一天的
-                shares_df.loc[day] = shares_df.shift(1).loc[day]
-                # 只有portfolio value重新計算
-                assets.loc[day, "portfolio_value"] = ((stock.loc[day].drop(["signal"]) * shares_df.loc[day]).sum())
-                assets.loc[day, ["cost", "init", "remain"]] = assets.shift(1).loc[day, ["cost", "init", "remain"]]
-                position.loc[day] = position.shift(1).loc[day]
+            else:  
+                first_trading = True
+                if not prev_values:    #如果prev_values沒有值 -> 代表還未出現交易
+                    assets.loc[day] = assets.shift(1).loc[day]
+                else: #有過交易，但出現全部都是False，清空倉位
+                    sell_money = ((stock.loc[day].drop(['signal']) * pd.Series(prev_values)).sum() * (1 - sell_extra_cost)) + assets.shift(1).loc[day, "remain"]
+                    sell_cost = (stock.loc[day].drop(['signal']) * pd.Series(prev_values)).sum() * sell_extra_cost
+                    remain = 0
+                    assets.loc[day, "portfolio_value"] = sell_money
+                    init_portfolio_value = sell_money
+                    assets.loc[day, ["cost", "init", "remain"]] = [sell_cost, sell_money, remain]
+                    prev_values={}
 
 
         # 再平衡（rebalance）
@@ -166,18 +172,20 @@ def sim(position, resample='D', init_portfolio_value = 10**6,  position_limit=1,
 
     stock_data = pd.DataFrame(index=stock_price.index)
     shares_df = shares_df.reindex(stock_price.index, method="ffill")
-    stock_data['portfolio_value'] = (stock_price * shares_df).sum(axis=1)
+    stock_data['portfolio_value'] = assets['portfolio_value'].asfreq('D', method='ffill')
+    start_trading_day = stock_data.loc[stock_data['portfolio_value'] != 0.0].index[0]
+    stock_data = stock_data.loc[start_trading_day:]
 
     # daily return
     stock_data['portfolio_returns'] = stock_data['portfolio_value'].pct_change(1)
     stock_data = stock_data.fillna(0).replace([np.inf, -np.inf], 0)
 
     # 累計報酬
-    stock_data['cum_returns'] = stock_data['portfolio_returns'].add(1).cumprod()
+    stock_data['cum_returns'] = stock_data['portfolio_returns'].add(1).cumprod().sub(1)
 
     # 每日入選股票數量
     stock_data['company_count'] = (position != 0).sum(axis=1)
-    stock_data['company_count'] = stock_data['company_count'].fillna(method='ffill')
+    stock_data['company_count'] = stock_data['company_count'].fillna(0)
     
     r = report.Report(stock_data, position)
 
