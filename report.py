@@ -2,16 +2,6 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
-
-# 用來安全進行除法的函數。如果分母 d 不等於零，則返回 n / d，否則返回 0。
-def safe_division(n, d):
-    return n / d if d else 0
-
-# 用來將dataframe按照月份排列
-def sort_month(df):
-    month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    return df[month_order]
-
 class Report():
     def __init__(self, stock_data, position) -> None:
         self.stock_data = stock_data
@@ -126,7 +116,8 @@ class Report():
             return (s / s.shift(period) - 1)
 
         drawdowns = self.calc_dd()
-        performance_detail = self.stock_data.replace([0],np.nan).dropna()
+        # performance_detail = self.stock_data.replace([0],np.nan).dropna()
+        performance_detail = self.stock_data
         position = position.loc[position.index.isin(performance_detail.index)]
         nstocks = (position != 0).sum(axis=1)
 
@@ -198,7 +189,7 @@ class Report():
             end : mdd結束日期
             days : 持續時間
         '''
-        r = self.stock_data['cum_returns'].replace([1],np.nan).dropna()
+        r = self.stock_data['portfolio_returns'].add(1).cumprod()
         dd = r.div(r.cummax()).sub(1)
         mdd = dd.min()
         # end = dd.idxmin()
@@ -312,7 +303,16 @@ class Report():
         stats['ytd'] = self.calc_ytd(pv, yv)
 
         return stats
-    
+
+# 用來安全進行除法的函數。如果分母 d 不等於零，則返回 n / d，否則返回 0。
+def safe_division(n, d):
+    return n / d if d else 0
+
+# 用來將dataframe按照月份排列
+def sort_month(df):
+    month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    return df[month_order] 
+
 def deannualize(returns, nperiods):
     """
     Convert return expressed in annual terms on a different basis.
@@ -322,7 +322,6 @@ def deannualize(returns, nperiods):
             monthly, etc.
     """
     return np.power(1 + returns, 1.0 / nperiods) - 1.0
-
 
 def to_excess_returns(returns, rf, nperiods=None):
     """
