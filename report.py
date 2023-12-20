@@ -3,10 +3,17 @@ import numpy as np
 import plotly.express as px
 
 class Report():
-    def __init__(self, stock_data, position) -> None:
+    def __init__(self, stock_data, position, data) -> None:
         self.stock_data = stock_data
         self.position = position
         self.calc_return_table()
+
+        self.benchmark = data.get('taiex: close')
+        self.benchmark.index = pd.to_datetime(self.benchmark.index)
+
+        self.daily_benchmark = rebase(self.benchmark\
+            .dropna().reindex(self.stock_data.index, method='ffill') \
+            .ffill())
 
     def display(self):
         from IPython.display import display
@@ -17,7 +24,7 @@ class Report():
         imp_stats = pd.Series({
          'annualized_rate_of_return':str(round(self.calc_cagr()*100, 2))+'%',
          'sharpe': str(self.calc_sharpe(self.stock_data['portfolio_returns'], nperiods=252)),
-         'max_drawdown':str(round(self.calc_dd().min()*100, 2))+'%',
+         'max_drawdown':str(round(self.calc_dd(self.stock_data['portfolio_returns']).min()*100, 2))+'%',
          'win_ratio':str(round(self.calc_win_ratio()*100, 2))+'%',
         }).to_frame().T
         imp_stats.index = ['']
@@ -116,8 +123,9 @@ class Report():
         def diff(s, period):
             return (s / s.shift(period) - 1)
 
-        drawdowns = self.calc_dd()
-        performance_detail = self.stock_data
+        drawdowns = self.calc_dd(self.stock_data['portfolio_returns'])
+        benchmark_drawdown = self.calc_dd(self.daily_benchmark['close'])
+        performance_detail = self.stock_data.copy()
         nstocks = self.stock_data['company_count']
 
         fig = go.Figure(make_subplots(
@@ -129,6 +137,16 @@ class Report():
         fig.add_scatter(x=performance_detail.index, y=diff(performance_detail['portfolio_returns'], 20),
                         fill='tozeroy', name='strategy - month rolling return',
                         row=3, col=1, legendgroup='rolling performance', )
+        
+        # benchmark
+        fig.add_scatter(x=performance_detail.index, y=self.daily_benchmark['close'] / 100 - 1,
+                        name='benchmark', row=1, col=1, legendgroup='performance', line={'color': 'gray'})
+        fig.add_scatter(x=drawdowns.index, y=benchmark_drawdown, name='benchmark - drawdown',
+                        row=2, col=1, legendgroup='drawdown', line={'color': 'gray'})
+        fig.add_scatter(x=performance_detail.index, y=diff(self.daily_benchmark['close'], 20),
+                        fill='tozeroy', name='benchmark - month rolling return',
+                        row=3, col=1, legendgroup='rolling performance', line={'color': 'rgba(0,0,0,0.2)'})
+
         fig.add_scatter(x=nstocks.index, y=nstocks, row=4,
                         col=1, name='nstocks', fill='tozeroy')
 
@@ -176,7 +194,7 @@ class Report():
         trades = self.stock_data.replace([0],np.nan).dropna()
         return sum(trades['portfolio_returns'] > 0) / len(trades) if len(trades) != 0 else 0
 
-    def calc_dd(self):
+    def calc_dd(self, daily_return):
         '''
         計算Drawdown的方式是找出截至當下的最大累計報酬(%)除以當下的累計報酬
         所以用累計報酬/累計報酬.cummax()
@@ -188,7 +206,8 @@ class Report():
             end : mdd結束日期
             days : 持續時間
         '''
-        drawdown = self.stock_data['portfolio_returns'].copy()
+        # drawdown = self.stock_data['portfolio_returns'].copy()
+        drawdown = daily_return.copy()
 
         # Fill NaN's with previous values
         drawdown = drawdown.ffill()
@@ -338,8 +357,8 @@ class Report():
         # stats["daily_mean"] = dr.mean() * 252
         stats["CAGR"] = self.calc_cagr()
         stats['daily_sharpe'] = self.calc_sharpe(dp, nperiods=252)
-        stats['max_drawdown'] = self.calc_dd().min()
-        stats['avg_drawdown'] = self.calc_dd().mean()
+        stats['max_drawdown'] = self.calc_dd(self.stock_data['portfolio_returns']).min()
+        stats['avg_drawdown'] = self.calc_dd(self.stock_data['portfolio_returns']).mean()
         stats['win_ratio'] = self.calc_win_ratio()
         stats['ytd'] = self.calc_ytd(dp,yp)
 
@@ -383,3 +402,16 @@ def to_excess_returns(returns, rf, nperiods=None):
         _rf = rf
 
     return returns - _rf
+
+def rebase(prices, value=100):
+    """
+    Rebase all series to a given intial value.
+    This makes comparing/plotting different series
+    together easier.
+    Args:
+        * prices: Expects a price series
+        * value (number): starting value for all series.
+    """
+    if isinstance(prices, pd.DataFrame):
+        return prices.div(prices.iloc[0], axis=1) * value
+    return prices / prices.iloc[0] * value
