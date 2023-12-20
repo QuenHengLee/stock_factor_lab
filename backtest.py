@@ -294,7 +294,7 @@ def sim(position: Union[pd.DataFrame, pd.Series],
     stock_data['cum_returns'] = creturn
     stock_data['company_count'] = (position != 0).sum(axis=1)
 
-    r = report.Report(stock_data, position)
+    r = report.Report(stock_data, position, data)
     return r
     """
     r = report.Report(
