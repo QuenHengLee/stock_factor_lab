@@ -12,93 +12,7 @@ from plotly.subplots import make_subplots
 import report
 from get_data import Data
 from core.backtest_core import backtest_, get_trade_stocks
-
-def get_stock_data(position, data):
-    '''
-    根據position裡面的columns(股票代號)從DB中取得資料
-    input:
-        position
-    return:
-        stock : 根據position的index取得該日期的股價
-        stock_price : 每一天的股價
-    '''
-    # 實際收盤價資料
-    if data:
-        all_close = data.get("price:close")
-    else:
-        data = Data()
-        all_close = data.get("price:close")
-    all_close.index = pd.to_datetime(all_close.index, format="%Y-%m-%d")
-    df_dict = {}
-    for symbol, p in position.items():
-        start = p.index[0]
-        end = p.index[-1]
-        all_close = all_close[start:end]
-        df_dict[symbol] = all_close[symbol]
-    # print("self.df_dict:", self.df_dict)
-
-    # 原本的DF 有開高低收量
-    stock = pd.concat(
-        [df_dict[symbol] for symbol in position.columns.tolist()],
-        axis=1,
-        keys=position.columns.tolist(),
-    )
-    # stock = pd.read_csv('../Data/Finlab/stock.csv').set_index('date')
-    # 讓日期格式一致
-    stock.index = pd.to_datetime(stock.index, format="%Y-%m-%d")
-    stock_price = stock.asfreq("D", method="ffill")
-    stock = stock_price.reindex(position.index, method="ffill")
-    stock_price['cash'] = 1
-    # stock = stock.asfreq("D", method="ffill")
-    # stock = stock.loc[stock.index.isin(position.index)]
-
-    return stock_price, stock
-
-def calc_weighted_positions(position, position_limit):
-    '''
-    根據「等權重」資金配置法，將position轉變為每支股票要投入的%數
-
-    Args:
-        position_limit:可以限制單一股票最高要投入幾%資金，控制風險用
-
-    return:
-        weighted_position: 加權過後的position
-
-    Exapmle:
-        原始position:
-            |            | Stock 2330 | Stock 1101 | Stock 2454 | Stock 2540 |
-            |------------|------------|------------|------------|------------|
-            | 2021-12-31 | True       | False      | False      | True       |
-            | 2022-03-31 | True       | True       | True       | False      |
-            | 2022-06-30 | False      | True       | False      | False      |
-        
-        加權過後position:
-            |            | Stock 2330 | Stock 1101 | Stock 2454 | Stock 2540 |
-            |------------|------------|------------|------------|------------|
-            | 2021-12-31 | 0.5        | 0          | 0          | 0.5        |
-            | 2022-03-31 | 0.25       | 0.25       | 0.25       | 0          |
-            | 2022-06-30 | 0          | 1          | 0          | 0          |
-    '''
-    position.index = pd.to_datetime(position.index)
-    # position = (position * stock) >0
-
-    # 統一日期
-    total_weight = position.abs().sum(axis=1)
-    position = position.div(total_weight.where(total_weight != 0, np.nan), axis = 0) \
-                    .fillna(0).clip(-abs(position_limit), abs(position_limit))
-    
-    return position
-
-def position_resample(position, resample):
-    '''
-    根據想要換股/再平衡的週期調整position
-    '''
-    position.index = pd.to_datetime(position.index, format='%Y-%m-%d')
-    # 先將position中按照想要輪動股票的週期排序
-    # position = position.asfreq(resample, method='ffill')
-    position = position.resample(resample).last().fillna(method='ffill')
-
-    return position
+from finlab.core import mae_mfe as maemfe
 
 def warning_resample(resample):
 
@@ -287,6 +201,75 @@ def sim(position: Union[pd.DataFrame, pd.Series],
     
     position = position.loc[creturn.index[0]:]
 
+    price_index = args[4]
+    position_columns = args[8]
+    trades, operation_and_weight = get_trade_stocks(position_columns, 
+                                                    price_index, touched_exit=touched_exit)
+
+    ####################################
+    # refine mae mfe dataframe
+    ####################################
+    def refine_mae_mfe():
+        if len(maemfe.mae_mfe) == 0:
+            return pd.DataFrame()
+
+        m = pd.DataFrame(maemfe.mae_mfe)
+        nsets = int((m.shape[1]-1) / 6)
+
+        metrics = ['mae', 'gmfe', 'bmfe', 'mdd', 'pdays', 'return']
+
+        tuples = sum([[(n, metric) if n == 'exit' else (n * mae_mfe_window_step, metric)
+                       for metric in metrics] for n in list(range(nsets)) + ['exit']], [])
+
+        m.columns = pd.MultiIndex.from_tuples(
+            tuples, names=["window", "metric"])
+        m.index.name = 'trade_index'
+        m[m == -1] = np.nan
+
+        exit = m.exit.copy()
+
+        if touched_exit and len(m) > 0 and 'exit' in m.columns:
+            m['exit'] = (exit
+                .assign(gmfe=exit.gmfe.clip(-abs(stop_loss), abs(take_profit)))
+                .assign(bmfe=exit.bmfe.clip(-abs(stop_loss), abs(take_profit)))
+                .assign(mae=exit.mae.clip(-abs(stop_loss), abs(take_profit)))
+                .assign(mdd=exit.mdd.clip(-abs(stop_loss), abs(take_profit))))
+
+        return m
+    
+    m = refine_mae_mfe()
+
+     ####################################
+    # refine trades dataframe
+    ####################################
+    def convert_datetime_series(df):
+        cols = ['entry_date', 'exit_date', 'entry_sig_date', 'exit_sig_date']
+        df[cols] = df[cols].apply(lambda s: pd.to_datetime(s).dt.tz_localize(tz))
+        return df
+
+    def assign_exit_nat(df):
+        cols = ['exit_date', 'exit_sig_date']
+        df[cols] = df[cols].loc[df.exit_index != -1]
+        return df
+
+    trades = (pd.DataFrame(trades, 
+                           columns=['stock_id', 'entry_date', 'exit_date',
+                                    'entry_sig_date', 'exit_sig_date', 'position', 
+                                    'period', 'entry_index', 'exit_index'])
+              .rename_axis('trade_index')
+              .pipe(convert_datetime_series)
+              .pipe(assign_exit_nat)
+              )
+    
+    if len(trades) != 0:
+        trades = trades.assign(**{'return': m.iloc[:, -1] - 2*fee_ratio - tax_ratio})
+
+    if touched_exit:
+        trades['return'] = trades['return'].clip(-abs(stop_loss), abs(take_profit))
+
+    trades = trades.drop(['entry_index', 'exit_index'], axis=1)
+
+    
     daily_creturn = rebase(creturn.resample('1d').last().dropna().ffill())
     
     stock_data = pd.DataFrame(index = creturn.index)
@@ -295,37 +278,6 @@ def sim(position: Union[pd.DataFrame, pd.Series],
     stock_data['company_count'] = (position != 0).sum(axis=1)
 
     r = report.Report(stock_data, position, data)
+    r.mae_mfe = m
+    r.trades = trades
     return r
-    """
-    r = report.Report(
-        creturn=creturn,
-        position=position,
-        fee_ratio=fee_ratio,
-        tax_ratio=tax_ratio,
-        trade_at=trade_at_price,
-        next_trading_date=next_trading_date,
-        market_info=market)
-
-
-    stock_data = pd.DataFrame(index=stock_price.index)
-    shares_df = shares_df.reindex(stock_price.index, method="ffill")
-    # stock_data['portfolio_value'] = assets['portfolio_value'].asfreq('D', method='ffill')
-    stock_data['portfolio_value'] = (stock_price * shares_df).sum(axis=1)
-    start_trading_day = stock_data.loc[stock_data['portfolio_value'] != 0.0].index[0]
-    stock_data = stock_data.loc[start_trading_day:]
-
-    # daily return
-    stock_data['portfolio_returns'] = stock_data['portfolio_value'].pct_change(1)
-    stock_data = stock_data.fillna(0).replace([np.inf, -np.inf, -1], 0)
-
-    # 累計報酬
-    stock_data['cum_returns'] = stock_data['portfolio_returns'].add(1).cumprod().sub(1)
-
-    # 每日入選股票數量
-    stock_data['company_count'] = (position != 0).sum(axis=1)
-    stock_data['company_count'] = stock_data['company_count'].fillna(0)
-    
-    r = report.Report(stock_data, position, assets)
-    return r
-    """
-    return position,dates,creturn,next_trading_date

@@ -8,12 +8,15 @@ class Report():
         self.position = position
         self.calc_return_table()
 
-        self.benchmark = data.get('taiex: close')
-        self.benchmark.index = pd.to_datetime(self.benchmark.index)
+        try:
+            self.benchmark = data.get('taiex: close')
+            self.benchmark.index = pd.to_datetime(self.benchmark.index)
 
-        self.daily_benchmark = rebase(self.benchmark\
-            .dropna().reindex(self.stock_data.index, method='ffill') \
-            .ffill())
+            self.daily_benchmark = rebase(self.benchmark\
+                .dropna().reindex(self.stock_data.index, method='ffill') \
+                .ffill())
+        except:
+            pass
 
     def display(self):
         from IPython.display import display
@@ -37,6 +40,8 @@ class Report():
         display(fig)
         display(yearly_return_fig)
         display(monthly_return_fig)
+        if hasattr(self, 'trades'):
+            display(self.trades)
     
     def create_monthly_return_figure(self):
         import plotly.express as px
@@ -124,7 +129,8 @@ class Report():
             return (s / s.shift(period) - 1)
 
         drawdowns = self.calc_dd(self.stock_data['portfolio_returns'])
-        benchmark_drawdown = self.calc_dd(self.daily_benchmark['close'])
+        if hasattr(self, 'benchmark'):
+            benchmark_drawdown = self.calc_dd(self.daily_benchmark['close'])
         performance_detail = self.stock_data.copy()
         nstocks = self.stock_data['company_count']
 
@@ -139,13 +145,14 @@ class Report():
                         row=3, col=1, legendgroup='rolling performance', )
         
         # benchmark
-        fig.add_scatter(x=performance_detail.index, y=self.daily_benchmark['close'] / 100 - 1,
-                        name='benchmark', row=1, col=1, legendgroup='performance', line={'color': 'gray'})
-        fig.add_scatter(x=drawdowns.index, y=benchmark_drawdown, name='benchmark - drawdown',
-                        row=2, col=1, legendgroup='drawdown', line={'color': 'gray'})
-        fig.add_scatter(x=performance_detail.index, y=diff(self.daily_benchmark['close'], 20),
-                        fill='tozeroy', name='benchmark - month rolling return',
-                        row=3, col=1, legendgroup='rolling performance', line={'color': 'rgba(0,0,0,0.2)'})
+        if hasattr(self, 'benchmark'):
+            fig.add_scatter(x=performance_detail.index, y=self.daily_benchmark['close'] / 100 - 1,
+                            name='benchmark', row=1, col=1, legendgroup='performance', line={'color': 'gray'})
+            fig.add_scatter(x=drawdowns.index, y=benchmark_drawdown, name='benchmark - drawdown',
+                            row=2, col=1, legendgroup='drawdown', line={'color': 'gray'})
+            fig.add_scatter(x=performance_detail.index, y=diff(self.daily_benchmark['close'], 20),
+                            fill='tozeroy', name='benchmark - month rolling return',
+                            row=3, col=1, legendgroup='rolling performance', line={'color': 'rgba(0,0,0,0.2)'})
 
         fig.add_scatter(x=nstocks.index, y=nstocks, row=4,
                         col=1, name='nstocks', fill='tozeroy')
@@ -363,6 +370,25 @@ class Report():
         stats['ytd'] = self.calc_ytd(dp,yp)
 
         return stats
+
+    def display_reutrn_treemap(self):
+        df = self.trades.copy()
+        df["cum_return"] =  (1 + df['return']).groupby(df['stock_id']).cumprod() - 1
+        df = df.groupby('stock_id').last()
+        df = df.reset_index()
+
+        fig = px.treemap(df, path=['stock_id'], values='cum_return',
+                 title='Treemap of Cumulative Returns by Stock',
+                 color='cum_return', color_continuous_scale='RdBu_r',color_continuous_midpoint=0,
+                 custom_data=['stock_id', 'cum_return'],
+                 width=1600,
+                 height=800)
+        fig.update_traces(textposition='middle center',
+                        textfont_size=20,
+                        texttemplate="%{label}<br>cum_return = %{customdata[1]:.2f}",
+                        )
+
+        fig.show()
 
 # 用來安全進行除法的函數。如果分母 d 不等於零，則返回 n / d，否則返回 0。
 def safe_division(n, d):
