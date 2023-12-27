@@ -1,9 +1,9 @@
-from get_data import Data
-from database import Database
-from backtest import *
+from iplab.get_data import Data
+from iplab.database import Database
+from iplab.backtest import *
 from datetime import datetime
 import pandas as pd
-from dataframe import CustomDataFrame
+from iplab.dataframe import CustomDataFrame
 import pandas as pd
 import numpy as np
 

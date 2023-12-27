@@ -9,9 +9,9 @@ from pandas.tseries.frequencies import to_offset
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 
-import report
-from get_data import Data
-from core.backtest_core import backtest_, get_trade_stocks
+import iplab.report
+from iplab.get_data import Data
+from iplab.core.backtest_core import backtest_, get_trade_stocks
 from finlab.core import mae_mfe as maemfe
 
 def warning_resample(resample):
