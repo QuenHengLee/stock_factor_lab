@@ -59,6 +59,9 @@ cdef double set_position(map[int, double] &p, int sid, double position, double c
         p.erase(sid)
       else:
         p[sid] = 0
+      # print(f'-----------{sid}_all_sell--------------')
+      # print(f'cash:"{cash}')
+      # print(f'p[{sid}]"{p[sid]}')
     return cash
   
   if not exist:
@@ -72,18 +75,33 @@ cdef double set_position(map[int, double] &p, int sid, double position, double c
   if buy:
     cash -= amount
     p[sid] += amount - cost
+    # print(f'---------------{sid}_buy--------------------')
+    # print(f'cash:{cash}')
+    # print(f'amount"{amount}')
+    # print(f'p[{sid}]"{p[sid]}')
   else:
     amount = -amount
     cash += amount - cost
     p[sid] -= amount
+    # print(f'---------------{sid}_part_sell------------------')
+    # print(f'cash:{cash}')
+    # print(f'amount"{amount}')
+    # print(f'p[{sid}]"{p[sid]}')
     
   if set_null and p[sid] == 0:
     p.erase(sid)
   
   return cash
 
-cdef double rebalance(map[int, double] &p, np.ndarray[np.float64_t, ndim=1] newp, double cash, double fee_ratio, double tax_ratio, double position_limit):
-  
+cdef double rebalance(map[int, double] &p, np.ndarray[np.float64_t, ndim=1] newp, 
+                    double cash, double fee_ratio, double tax_ratio, double position_limit, 
+                    double rolling_ratio, bool should_rolling, double profit,
+                    double profit_rolling_ratio, double loss_rolling_ratio,
+                    double rolling_stop_loss, double rolling_take_profit):
+  # print('----------------rebalance----------------')
+  # print(f'p:{p}')
+  # print(f'newp:{newp}')
+  # print(f'cash:{cash}')
   # calculate total balance b1
   cdef double balance = cash
   
@@ -94,8 +112,36 @@ cdef double rebalance(map[int, double] &p, np.ndarray[np.float64_t, ndim=1] newp
     
   cdef double v1
   cdef double v2
+  cdef double ratio
+  cdef double temp_cash
   
-  cdef double ratio = balance / max(org_np.abs(newp).sum(), 1)
+  # 將現今除以共有幾個買入訊號
+  # 相當於將現金分成幾分
+  if should_rolling:
+    # print("-----rolling----")
+    # 若是賺錢要roll多一點
+    if profit > rolling_take_profit:
+      # print('profit')
+      ratio = balance / (max(org_np.abs(newp).sum(), 1) / profit_rolling_ratio)
+      temp_cash = 1.0 - profit_rolling_ratio
+
+    # 若是賠錢roll少一點
+    elif profit < -rolling_stop_loss:
+      # print('loss')
+      ratio = balance / (max(org_np.abs(newp).sum(), 1) / loss_rolling_ratio)
+      temp_cash = 1.0 - loss_rolling_ratio
+
+    else:
+      # print('normal')
+      ratio = balance / (max(org_np.abs(newp).sum(), 1) / rolling_ratio)
+      temp_cash = 1.0 - rolling_ratio
+    cash = cash - temp_cash
+    
+    # print(f'temp_cash:{temp_cash}')
+    # print(f'cash:{cash}')
+  else:
+    ratio = balance / max(org_np.abs(newp).sum(), 1)
+
   if isnan(ratio):
     ratio = 1
 
@@ -112,6 +158,12 @@ cdef double rebalance(map[int, double] &p, np.ndarray[np.float64_t, ndim=1] newp
               fee_ratio=fee_ratio, tax_ratio=tax_ratio, 
               check_null=True, set_null=True, balance=balance)
   
+  # print(f'cash:{cash}')
+  if should_rolling:
+    cash += temp_cash
+  #   print(f'cash add temp:{cash}')
+  # print('----------------rebalance End----------------')
+
   return cash
 
 cdef map_columns(price_columns, pos_columns):
@@ -133,7 +185,7 @@ cpdef ioft(v):
 
 cpdef np.ndarray[np.float64_t] backtest_(
 
-  # 收盤價等的數值，通常為 data.get('etl:adj_close').values
+  # 收盤價等的數值，為 data.get('price:close').values
   np.ndarray[np.float64_t, ndim=2] price_values,
   np.ndarray[np.float64_t, ndim=2] high_values,
   np.ndarray[np.float64_t, ndim=2] low_values,
@@ -157,8 +209,13 @@ cpdef np.ndarray[np.float64_t] backtest_(
   # resample dates
   np.ndarray[np.int64_t, ndim=1] resample,
 
+  # rolling dates
+  np.ndarray[np.int64_t, ndim=1] rolling_dates,
+
   # 回測相關參數
-  double fee_ratio=1.425/1000, double tax_ratio=3/1000,
+  double fee_ratio=1.425/1000, double tax_ratio=3/1000, double rolling_ratio=1.0,
+  double loss_rolling_ratio=1.0, double profit_rolling_ratio=1.0,
+  double rolling_take_profit=org_np.inf, double rolling_stop_loss=-org_np.inf,
   double stop_loss=1.0, double take_profit=org_np.inf, double trail_stop=org_np.inf, bool touched_exit=False,
   double position_limit=1.0, bool retain_cost_when_rebalance=False, stop_trading_next_period=True, int mae_mfe_window=0, int mae_mfe_window_step=1):
 
@@ -193,6 +250,9 @@ cpdef np.ndarray[np.float64_t] backtest_(
   # 判斷當天是否要進行再平衡
   cdef bool should_rebalance = False
 
+  # 判斷當天是否要rolling
+  cdef bool should_rolling = False
+
   # 回測每天的淨資產部位
   cdef np.ndarray[double, ndim=1] creturn = org_np.empty(price_index.size, dtype=org_np.float64)
 
@@ -209,6 +269,11 @@ cpdef np.ndarray[np.float64_t] backtest_(
   # 回測預先記錄明天要出場的股票記錄
   cdef vector[int] exit_stocks_temp
 
+  # 紀錄T2窗格開始時的balance，目的是計算此次窗格的損益
+  cdef double balance_temp = 1
+  cdef bool t2_window_start = False
+  cdef double profit
+
 
   # 在 rebalance 之間停損停利的股票
   # 正號代表停利，負號代表停損
@@ -221,6 +286,9 @@ cpdef np.ndarray[np.float64_t] backtest_(
 
   # 以 price.index 的長度來記錄當天是否 position 需要 rebalance
   cdef vector[long long] date_rebalance = [0] * price_index.size
+
+  # 以 price.index 的長度來記錄當天是否需要 rolling
+  cdef vector[long long] date_rolling = [0] * price_index.size
 
   ################################
   # 計算 date_rebalance
@@ -239,6 +307,23 @@ cpdef np.ndarray[np.float64_t] backtest_(
     # update date_rebalance
     date_rebalance[ptr] = 1
 
+  ################################
+  # 計算 date_rolling
+  ################################
+  
+  # calculate date rolling values 0: no-rolling 1: rolling
+  ptr = 0
+  
+  for i in range(0, rolling_dates.size):
+    d = rolling_dates[i]
+    
+    # 假如明天有數值，且明天的日期小於下個需要 rolling 的日期，則當天不需要 rolling ，跳過。
+    while ptr+1 < price_index.size and price_index[ptr+1] <= d:
+      ptr += 1
+
+    # update date_rolling
+    date_rolling[ptr] = 1
+
   # 用來記錄交易時進出場資訊
   start_analysis(price_values, pos2price, nstocks=pos_columns.size, window_=mae_mfe_window, window_step_=mae_mfe_window_step)
 
@@ -246,7 +331,7 @@ cpdef np.ndarray[np.float64_t] backtest_(
   # 開始回測
   for d, date in enumerate(price_index):
 
-
+    # print(f'****************{d}**************')
     # 快速計算，回測部位還未開始變化，淨值不變
     if date < pos_index[0]:
         creturn[d] = 1
@@ -260,6 +345,8 @@ cpdef np.ndarray[np.float64_t] backtest_(
     ########################################
     balance = cash
     it = pos.begin()
+    # print(f'----------------d------------------:{d}')
+    # print(f'pos_first:{pos}')
     while it != pos.end():
 
       # 股票的 id 還有此資產淨值
@@ -307,11 +394,6 @@ cpdef np.ndarray[np.float64_t] backtest_(
       else:
         max_r = min(1 + stop_loss_abs, maxcr[sid] + trail_stop_abs)
         min_r = 1 - take_profit_abs
-       
-      # max_pos = entry_pos * (1+take_profit_abs
-      #   if entry_pos >= 0 else 1-stop_loss_abs)
-      # min_pos = entry_pos * (1-stop_loss_abs
-      #   if entry_pos >= 0 else 1+take_profit_abs)
 
       ########################################
       # 執行當天觸價停損停利(觸價出場)
@@ -381,7 +463,6 @@ cpdef np.ndarray[np.float64_t] backtest_(
         elif cr[sid] < min_r:
           exit_stocks_temp.push_back(-sid)
 
-
       # 將當下價格存起來，等到下個 iteration 變成昨日價格
       if not isnan(price_values[d, sidprice]):
         previous_price[sidprice] = price_values[d, sidprice]
@@ -390,7 +471,6 @@ cpdef np.ndarray[np.float64_t] backtest_(
       balance += pos[sid]
       postincrement(it)
 
-    
     ########################################
     # 執行當天的停損停利(非觸價出場)
     # 這個停損停利是昨天排定的，於今天執行
@@ -418,6 +498,9 @@ cpdef np.ndarray[np.float64_t] backtest_(
     # 整體資產再平衡
     ########################################
     if should_rebalance:
+      t2_window_start = True
+      profit = balance - balance_temp
+      # print(f't2 profit:{balance - balance_temp}')
 
       # 當 retain_cost_when_rebalance 開啟時
       # 只要繼續持有，就算 rebalance 後報酬率不會重設
@@ -436,8 +519,11 @@ cpdef np.ndarray[np.float64_t] backtest_(
       if stop_trading_next_period:
           for sid in exited_stocks:
               pos_values[pos_id, abs(sid)] = 0
-
-      cash = rebalance(pos, pos_values[pos_id], cash=cash, fee_ratio=fee_ratio, tax_ratio=tax_ratio, position_limit=position_limit)
+      cash = rebalance(pos, pos_values[pos_id], cash=cash, 
+                      fee_ratio=fee_ratio, tax_ratio=tax_ratio, position_limit=position_limit, 
+                      rolling_ratio=rolling_ratio, should_rolling=should_rolling,
+                      profit=profit, profit_rolling_ratio=profit_rolling_ratio, loss_rolling_ratio=loss_rolling_ratio,
+                      rolling_take_profit=rolling_take_profit, rolling_stop_loss=rolling_stop_loss)
       exited_stocks.clear()
       exit_stocks_temp.clear()
 
@@ -454,8 +540,15 @@ cpdef np.ndarray[np.float64_t] backtest_(
     while it != pos.end():
       balance += dereference(it).second
       postincrement(it)
-    
+    # print(f'pos_end:{pos}')
+    # print(f'balance:{balance}')
     creturn[d] = balance
+    
+    # 將本次balanace儲存，下次
+    if t2_window_start:
+      balance_temp = balance
+
+      # print(f'balance tmep:{balance_temp}')
     
     ########################################
     # 判斷明天是否需要再平衡
@@ -474,12 +567,13 @@ cpdef np.ndarray[np.float64_t] backtest_(
     
     if not new_pos or date_rebalance[d] == 0:
       should_rebalance = False
+      should_rolling = False
+      t2_window_start = False
       continue
-    
-    # diff = ((current_position_id == -1) or (org_np.abs(pos_values[pos_id] - pos_values[current_position_id]).sum() > 0))
-    # should_rebalance = diff
-    should_rebalance = True
 
+    should_rebalance = True
+    if date_rolling[d] == 1:
+      should_rolling = True
   end_analysis(pos)
   
   ########################################
@@ -553,6 +647,7 @@ cpdef np.ndarray[np.float64_t] backtest_(
     stock_operations['actions'][abs(sid)] = 'tp_' if sid > 0 else 'sl_'
 
   return creturn
+  
 
 cpdef get_trade_stocks(np.ndarray[np.str, ndim=1] pos_columns, np.ndarray[np.int64_t, ndim=1] price_index, bool touched_exit):
 

@@ -40,8 +40,8 @@ class Report():
         display(fig)
         display(yearly_return_fig)
         display(monthly_return_fig)
-        if hasattr(self, 'trades'):
-            display(self.trades)
+        if hasattr(self, 'current_trades'):
+            display(self.current_trades)
     
     def create_monthly_return_figure(self):
         import plotly.express as px
