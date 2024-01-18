@@ -1,8 +1,8 @@
 from itertools import combinations
 import pandas as pd
-from backtest import sim
-from report import Report
-from dataframe import CustomDataFrame
+from iplab.backtest import sim
+from iplab.report import Report
+from iplab.dataframe import CustomDataFrame
 from tqdm import tqdm
 
 def sim_conditions(conditions, combination=False, *args, **kwargs):

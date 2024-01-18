@@ -2,7 +2,7 @@
 # 這些function是將原始DB TABLE的資料轉成get() api可用格式
 
 import pandas as pd
-from dataframe import CustomDataFrame
+from iplab.dataframe import CustomDataFrame
 from datetime import datetime, timedelta
 
 # Abstract API：

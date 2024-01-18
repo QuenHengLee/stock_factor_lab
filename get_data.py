@@ -1,7 +1,6 @@
-from database import Database
-from dataframe import CustomDataFrame
-from dataframe import CustomDataFrame
-from format_data import *
+from iplab.database import Database
+from iplab.dataframe import CustomDataFrame
+from iplab.format_data import *
 import talib
 import pandas as pd
 import numpy as np
@@ -37,6 +36,7 @@ class Data:
         self.all_price_dict = self.handle_price_data()
         # 下載財報資料
         self.raw_report_data = self.db.get_finance_report()
+        self.raw_taiex_data = self.db.get_taiex_data()
 
     def format_price_data(self, item):
         """
@@ -91,7 +91,8 @@ class Data:
         - 如果輸入格式不正確，將列印錯誤訊息。
 
         使用示例:
-        ```
+        
+
         # 創建類的實例
         my_instance = YourClass()
         # 呼叫get方法取得股價資料
@@ -100,10 +101,12 @@ class Data:
         # 或者呼叫get方法取得多個財報資料
         report_data = my_instance.get("report:roe,eps")
         # report_data 是一個字典，包含多個財報資料，例如 {"roe": DataFrame, "eps": DataFrame}。
-        ```
+        
+
         """
         # 使用 lower() 方法將字串轉換為小寫
         dataset = dataset.lower()
+        dataset = dataset.replace(" ", "")
         # 使用 split() 函數按 ":" 分隔字串
         parts = dataset.split(":")
         if len(parts) == 2:
@@ -115,31 +118,28 @@ class Data:
         if subject == "price":
             # 呼叫處理開高低收的FUNCT
             price_data = self.all_price_dict[item]
+            # 處理價量資料缺漏植問題: ffill
+            price_data.fillna(method="ffill", inplace=True)
             return price_data
         elif subject == "report":
             # 財報資料的Header為大寫
             item = item.upper().replace(" ", "")
             report_data = self.format_report_data(item)
+            # 財報資料日期調整
+            adjusted_report_data = adjust_index_of_report(report_data)
+            # 處理財報資料缺漏植問題: ffill
+            adjusted_report_data.fillna(method="ffill", inplace=True)
             # return report_data
-            return adjust_index_of_report(report_data)
+            return adjusted_report_data
 
-        # elif subject == "report":
-        #     # 財報資料的Header為大寫
-        #     item = item.upper().replace(" ", "")
-        #     # 可能會有多個財報資料，以逗號加空格為分隔符
-        #     # 將字串以逗號加空格為分隔符，分割成元素列表
-        #     elements = item.split(",")
-        #     # 創建一個以元素為鍵，空字串為值的字典
-        #     element_dict = {element: "" for element in elements}
-        #     # 使用迴圈遍歷字典的鍵值對
-        #     for key, value in element_dict.items():
-        #         # 呼叫處理財報的FUNCT
-        #         element_dict[key] = self.format_report_data(key)
+        # EX. 想要取得台股加權指數(收盤價):
+        # taiex_close = data.get("taiex: close")
+        elif subject == "taiex":
+            self.raw_taiex_data.set_index("date", inplace=True)
+            return self.raw_taiex_data[[item]]
 
-        #     # 有多個財報資料時，回傳一個字典
-        #     return element_dict
         else:
-            print("目前資料來源有price、report")
+            print("目前資料來源有price、report、taiex")
 
     def indicator(self, indname, adjust_price=False, resample="D", **kwargs):
         """支援 Talib 和 pandas_ta 上百種技術指標，計算 2000 檔股票、10年的所有資訊。
@@ -155,8 +155,8 @@ class Data:
 
                 以 Pandas-ta 舉例，例如 supertrend, ssf 等，可以參考 [Pandas-ta 文件](https://twopirllc.github.io/pandas-ta/#indicators-by-category)。
             adjust_price (bool): 是否使用還原股價計算。
-            resample (str): 技術指標價格週期，ex: `D` 代表日線, `W` 代表週線, `M` 代表月線。
-            market (str): 市場選擇，ex: `TW_STOCK` 代表台股, `US_STOCK` 代表美股。
+            resample (str): 技術指標價格週期，ex: D 代表日線, W 代表週線, M 代表月線。
+            market (str): 市場選擇，ex: TW_STOCK 代表台股, US_STOCK 代表美股。
             **kwargs (dict): 技術指標的參數設定，TA-Lib 中的 RSI 為例，調整項為計算週期 `timeperiod=14`。
         建議使用者可以先參考以下範例，並且搭配 talib官方文件，就可以掌握製作技術指標的方法了。
         """
@@ -310,11 +310,4 @@ if __name__ == "__main__":
     # print(rsi)
     # rsi.to_csv('./OutputFile/self_rsi.csv')
 
-    # price = data.handle_price_data()
-    # print(price)
-
-    # all_companys = get_all_company_symbol(data.raw_price_data)
-    # print(all_companys)
-
-    # b = adx = data.indicator("ADX", timeperiod=50)
-    # b
+    # price = d
