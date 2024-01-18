@@ -44,6 +44,7 @@ def get_stock_data(position, data):
         keys=position.columns.tolist(),
     )
     # stock = pd.read_csv('../Data/Finlab/stock.csv').set_index('date')
+    # stock = pd.read_csv('../Data/Finlab/stock.csv').set_index('date')
     # 讓日期格式一致
     stock.index = pd.to_datetime(stock.index, format="%Y-%m-%d")
     stock_price = stock.asfreq("D", method="ffill")
@@ -324,6 +325,10 @@ def sim(position: Union[pd.DataFrame, pd.Series],
     # 每日入選股票數量
     stock_data['company_count'] = (position != 0).sum(axis=1)
     stock_data['company_count'] = stock_data['company_count'].fillna(0)
+
+    # 每日入選股票數量
+    stock_data['company_count'] = (position != 0).sum(axis=1)
+    stock_data['company_count'] = stock_data['company_count'].fillna(method='ffill')
     
     r = report.Report(stock_data, position, assets)
     return r

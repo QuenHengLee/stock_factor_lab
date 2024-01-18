@@ -5,7 +5,6 @@ from report import Report
 from dataframe import CustomDataFrame
 from tqdm import tqdm
 
-
 def sim_conditions(conditions, combination=False, *args, **kwargs):
     """取得回測報告集合
 
@@ -26,6 +25,8 @@ def sim_conditions(conditions, combination=False, *args, **kwargs):
     reports = {}
     for k, v in tqdm(conditions.items(), desc="Backtesting progress", unit="condition"):
         reports[k] = sim(v, *args, **kwargs)
+    for k, v in tqdm(conditions.items(), desc="Backtesting progress", unit="condition"):
+        reports[k] = sim(v, *args, **kwargs)
 
     return ReportCollection(reports)
 
@@ -40,6 +41,7 @@ class ReportCollection:
           reports (dict): 回測物件集合，ex:`{'strategy1': finlab.backtest.sim(),'strategy2': finlab.backtest.sim()}`
         """
         self.reports = reports
+        self.stats = self.get_stats()
         self.stats = self.get_stats()
 
     def plot_creturns(self):
@@ -158,6 +160,7 @@ class ReportCollection:
         指標欄位說明：
 
         * `'CAGR'`: 策略年化報酬
+        * `'CAGR'`: 策略年化報酬
         * `'daily_sharpe'`: 策略年化夏普率
         * `'max_drawdown'`: 策略報酬率最大回撤率(負向)
         * `'avg_drawdown'`: 策略平均回撤(負向)
@@ -171,6 +174,10 @@ class ReportCollection:
         def get_strategy_indicators(report):
             if isinstance(report, Report):
                 stats = report.get_stats()
+                strategy_indexes = {n: stats[n] for n in
+                                    ['CAGR', 'daily_sharpe',
+                                     'max_drawdown', 'avg_drawdown', 
+                                     'win_ratio', 'ytd']}
                 strategy_indexes = {
                     n: stats[n]
                     for n in [
