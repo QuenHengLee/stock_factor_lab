@@ -1,9 +1,13 @@
 # 從原本get_data.py節取出來的，更模組化
 # 這些function是將原始DB TABLE的資料轉成get() api可用格式
 
-import pandas as pd
+
+# 內部import
 from dataframe import CustomDataFrame
 from datetime import datetime, timedelta
+
+# 外部import
+import pandas as pd
 
 # Abstract API：
 from talib import abstract
@@ -142,6 +146,27 @@ def get_number_of_indicator_return(indname, tmp_company_daily_price):
 
 
 def adjust_index_of_report(df):
+    """
+    調整 DataFrame 的索引，根據特定日期調整規則。
+
+    Args:
+        df (pd.DataFrame): 需要進行索引調整的 DataFrame。
+
+    Returns:
+        pd.DataFrame: 調整後的 DataFrame。
+
+    Notes:
+        日期調整規則：
+        - 如果原始日期的月份為3，新日期為該年的5月15日。
+        - 如果原始日期的月份為6，新日期為該年的8月31日。
+        - 如果原始日期的月份為9，新日期為該年的11月15日。
+        - 如果原始日期的月份為12，新日期為該年的12月31日（加90天）。
+        - 如果日期不符合上述規則，保持不變。
+
+    Example:
+        df = adjust_index_of_report(df)
+
+    """
     # 將日期字符串轉換為 datetime 對象
     df.index = pd.to_datetime(df.index)
 
@@ -170,6 +195,3 @@ def adjust_index_of_report(df):
     df.index = new_index
 
     return df
-
-
-# if __name__ == "__main__":

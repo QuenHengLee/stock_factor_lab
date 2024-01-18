@@ -3,6 +3,8 @@ import pandas as pd
 from backtest import sim
 from report import Report
 from dataframe import CustomDataFrame
+from tqdm import tqdm
+
 
 def sim_conditions(conditions, combination=False, *args, **kwargs):
     """取得回測報告集合
@@ -21,25 +23,9 @@ def sim_conditions(conditions, combination=False, *args, **kwargs):
 
     """
 
-    key_dataset = []
-    conditions.pop('__builtins__', None)
-    new_conditions = {}
-    for k, v in conditions.items():
-        v = CustomDataFrame(v)
-        new_conditions[k] = v
-    if combination:
-        for i in range(1, len(new_conditions) + 1):
-            key_dataset.extend(list(combinations(new_conditions.keys(), i)))
-        conditions_combinations = [' & '.join(k) for k in key_dataset]
-    else:
-        key_dataset.extend(list(new_conditions.keys()))
-        conditions_combinations = key_dataset
-
     reports = {}
-    for k in conditions_combinations:
-        position = eval(k, new_conditions)
-
-        reports[k] = sim(position, *args, **kwargs)
+    for k, v in tqdm(conditions.items(), desc="Backtesting progress", unit="condition"):
+        reports[k] = sim(v, *args, **kwargs)
 
     return ReportCollection(reports)
 
@@ -54,7 +40,7 @@ class ReportCollection:
           reports (dict): 回測物件集合，ex:`{'strategy1': finlab.backtest.sim(),'strategy2': finlab.backtest.sim()}`
         """
         self.reports = reports
-        self.stats = None
+        self.stats = self.get_stats()
 
     def plot_creturns(self):
         """繪製策略累積報酬率
@@ -71,21 +57,107 @@ class ReportCollection:
 
         fig = go.Figure()
         reports = self.reports
-        dataset = {k: v for k, v in sorted(reports.items(), key=lambda item: item[1].stock_data['cum_returns'].iloc[-1], reverse=True)}
+        dataset = {
+            k: v
+            for k, v in sorted(
+                reports.items(),
+                key=lambda item: item[1].stock_data["cum_returns"].iloc[-1],
+                reverse=True,
+            )
+        }
         for k, v in dataset.items():
-            series = v.stock_data['cum_returns']
-            fig.add_trace(go.Scatter(x=series.index, y=series.values, mode='lines', name=k, meta=k,
-                                        hovertemplate="%{meta}<br>Date:%{x}<br>Creturns:%{y}<extra></extra>"))
-        fig.update_layout(title={'text': 'Cumulative returns', 'x': 0.49, 'y': 0.9, 'xanchor': 'center',
-                                    'yanchor': 'top'})
+            series = v.stock_data["cum_returns"]
+            fig.add_trace(
+                go.Scatter(
+                    x=series.index,
+                    y=series.values,
+                    mode="lines",
+                    name=k,
+                    meta=k,
+                    hovertemplate="%{meta}<br>Date:%{x}<br>Creturns:%{y}<extra></extra>",
+                )
+            )
+        fig.update_layout(
+            title={
+                "text": "Cumulative returns",
+                "x": 0.49,
+                "y": 0.9,
+                "xanchor": "center",
+                "yanchor": "top",
+            }
+        )
         return fig
-    
+
+    # 將欲畫出的回測績效指標以參數方式帶入method
+    def plot_custom_metric(self, metric_column="portfolio_value"):
+        """繪製策略自定義指標的變化曲線
+
+        比較策略自定義指標曲線變化
+
+        Args:
+            metric_column (str): 要繪製的指標數據列名稱，預設為 'portfolio_value'，
+            亦可輸入: portfolio_value, portfolio_returns	, cum_returns, company_count
+
+        Returns:
+            (plotly.graph_objects.Figure): 折線圖
+
+        Examples:
+            ![line](img/optimize/report_collection_custom_metric.png)
+        """
+        import plotly.graph_objects as go
+
+        # 建立一個空的 Figure
+        fig = go.Figure()
+
+        # 從類別實例中取得報告
+        reports = self.reports
+
+        # 根據最後一個數據點的指標值對報告進行排序
+        dataset = {
+            k: v
+            for k, v in sorted(
+                reports.items(),
+                key=lambda item: item[1].stock_data[metric_column].iloc[-1],
+                reverse=True,
+            )
+        }
+
+        # 迭代排序後的數據集，將跡線添加到圖中
+        for k, v in dataset.items():
+            series = v.stock_data[metric_column]
+            fig.add_trace(
+                go.Scatter(
+                    x=series.index,
+                    y=series.values,
+                    mode="lines",
+                    name=k,
+                    meta=series.index,  # Use series index as meta information (you can adjust this based on your data)
+                    hovertemplate="%{meta}<br>Date:%{x}<br>metric_value: %{y}<extra></extra>",
+                )
+            )
+
+        # 更新圖的佈局，包括標題
+        fig.update_layout(
+            title={
+                "text": "{} 曲線".format(metric_column),
+                "x": 0.49,
+                "y": 0.9,
+                "xanchor": "center",
+                "yanchor": "top",
+                # Add other layout configurations as needed
+            }
+        )
+
+        # 顯示圖表
+        # fig.show()
+        return fig
+
     def get_stats(self):
         """取得策略指標比較表
 
         指標欄位說明：
 
-        * `'daily_mean'`: 策略年化報酬
+        * `'CAGR'`: 策略年化報酬
         * `'daily_sharpe'`: 策略年化夏普率
         * `'max_drawdown'`: 策略報酬率最大回撤率(負向)
         * `'avg_drawdown'`: 策略平均回撤(負向)
@@ -99,20 +171,29 @@ class ReportCollection:
         def get_strategy_indicators(report):
             if isinstance(report, Report):
                 stats = report.get_stats()
-                strategy_indexes = {n: stats[n] for n in
-                                    ['daily_mean', 'daily_sharpe',
-                                     'max_drawdown', 'avg_drawdown', 
-                                     'win_ratio', 'ytd']}
+                strategy_indexes = {
+                    n: stats[n]
+                    for n in [
+                        "CAGR",
+                        "daily_sharpe",
+                        "max_drawdown",
+                        "avg_drawdown",
+                        "win_ratio",
+                        "ytd",
+                    ]
+                }
                 # trade_indexes.update(
                 #     {f'avg_{n}': trades[n].mean() for n in ['return', 'mae', 'bmfe', 'gmfe', 'mdd']})
                 # strategy_indexes.update(trade_indexes)
                 return strategy_indexes
 
-        df = pd.DataFrame({k: get_strategy_indicators(v) for k, v in self.reports.items()})
+        df = pd.DataFrame(
+            {k: get_strategy_indicators(v) for k, v in self.reports.items()}
+        )
         self.stats = df
         return df
 
-    def plot_stats(self, mode='bar', heatmap_sort_by='avg_score', indicators=[]):
+    def plot_stats(self, mode="bar", heatmap_sort_by="avg_score", indicators=[]):
         """策略指標比較報表視覺化
 
         Args:
@@ -129,18 +210,38 @@ class ReportCollection:
             self.get_stats()
         df = self.stats
 
-        if mode == 'bar':
+        if mode == "bar":
             import plotly.graph_objects as go
+
             items = df.columns
-            fig = go.Figure(data=[go.Bar(x=df.index, y=df[item], name=item, meta=[item],
-                                         hovertemplate="%{meta}<br>%{label}<br>%{y}<extra></extra>") for item in items])
+            fig = go.Figure(
+                data=[
+                    go.Bar(
+                        x=df.index,
+                        y=df[item],
+                        name=item,
+                        meta=[item],
+                        hovertemplate="%{meta}<br>%{label}<br>%{y}<extra></extra>",
+                    )
+                    for item in items
+                ]
+            )
             # Change the bar mode
-            fig.update_layout(title={'text': 'Backtest combinations stats', 'x': 0.49, 'y': 0.9, 'xanchor': 'center',
-                                     'yanchor': 'top'}, barmode='group')
+            fig.update_layout(
+                title={
+                    "text": "Backtest combinations stats",
+                    "x": 0.49,
+                    "y": 0.9,
+                    "xanchor": "center",
+                    "yanchor": "top",
+                },
+                barmode="group",
+            )
             return fig
 
-        elif mode == 'heatmap':
-            return df.rank(pct=True, axis=1).transpose().assign(avg_score=lambda d: d.mean(axis=1)).round(2).mul(
-                100).sort_values(heatmap_sort_by, ascending=False).style.set_caption(
-                "Backtest combinations heatmap").format('{:.1f}%').background_gradient(axis=None, vmin=0, vmax=100,
-                                                                                       cmap="plasma")
+        elif mode == "heatmap":
+            return (
+                df.T.sort_values("CAGR", ascending=False)
+                .style.set_caption("Backtest combinations heatmap")
+                .background_gradient(axis=0, cmap="YlGn")
+            )

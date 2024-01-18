@@ -882,6 +882,7 @@ class CustomDataFrame(pd.DataFrame):
         # 計算每個日期非NaN的公司數量
         num_companies = (~pd.isna(self)).sum(axis=1)
 
+        # 計算每個quantile內有幾個公司
         interval = num_companies // quantile
 
         # 創建N個DataFrame，用於存放不同分位的公司
@@ -904,6 +905,8 @@ class CustomDataFrame(pd.DataFrame):
         return result_dict
 
 
+ 
+
 
 if __name__ == "__main__":
     # 生成一個範例 DataFrame
@@ -912,9 +915,12 @@ if __name__ == "__main__":
     data = np.random.randint(0, 100, size=(10, 10))
 
     # 將數據轉換成 DataFrame
-    df = pd.DataFrame(data, columns=[f'Col{i+1}' for i in range(10)], index=[f'Row{j+1}' for j in range(10)])
+    df = pd.DataFrame(
+        data,
+        columns=[f"Col{i+1}" for i in range(10)],
+        index=[f"Row{j+1}" for j in range(10)],
+    )
 
     df = CustomDataFrame(df)
 
-    r_list = df.divide_slice() 
-
+    r_list = df.divide_slice()

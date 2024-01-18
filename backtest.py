@@ -1,9 +1,17 @@
-import pandas as pd
+import sys
+import warnings
+import datetime
 import numpy as np
+import pandas as pd
+from typing import Union
+from pandas.tseries.offsets import DateOffset
+from pandas.tseries.frequencies import to_offset
 import plotly.graph_objs as go
-import report
 from plotly.subplots import make_subplots
+
+import report
 from get_data import Data
+from core.backtest_core import backtest_, get_trade_stocks
 
 def get_stock_data(position, data):
     '''
@@ -35,12 +43,14 @@ def get_stock_data(position, data):
         axis=1,
         keys=position.columns.tolist(),
     )
+    # stock = pd.read_csv('../Data/Finlab/stock.csv').set_index('date')
     # 讓日期格式一致
     stock.index = pd.to_datetime(stock.index, format="%Y-%m-%d")
-    stock.ffill(inplace=True)
     stock_price = stock.asfreq("D", method="ffill")
-    stock = stock.asfreq("D", method="ffill")
-    stock = stock.loc[stock.index.isin(position.index)]
+    stock = stock_price.reindex(position.index, method="ffill")
+    stock_price['cash'] = 1
+    # stock = stock.asfreq("D", method="ffill")
+    # stock = stock.loc[stock.index.isin(position.index)]
 
     return stock_price, stock
 
@@ -70,6 +80,7 @@ def calc_weighted_positions(position, position_limit):
             | 2022-06-30 | 0          | 1          | 0          | 0          |
     '''
     position.index = pd.to_datetime(position.index)
+    # position = (position * stock) >0
 
     # 統一日期
     total_weight = position.abs().sum(axis=1)
@@ -84,96 +95,237 @@ def position_resample(position, resample):
     '''
     position.index = pd.to_datetime(position.index, format='%Y-%m-%d')
     # 先將position中按照想要輪動股票的週期排序
-    position = position.asfreq(resample, method='ffill')
+    # position = position.asfreq(resample, method='ffill')
+    position = position.resample(resample).last().fillna(method='ffill')
 
     return position
 
-def sim(position, resample='D', init_portfolio_value = 10**6,  position_limit=1, fee_ratio=1.425/1000, tax_ratio=3/1000, data=None):
-    # 初始金額
-    # self.init_portfolio_value = init_portfolio_value
-    position = position_resample(position, resample)
-    position = calc_weighted_positions(position, position_limit)
+def warning_resample(resample):
 
-    # 取得股價資料
-    stock_price, stock = get_stock_data(position,data)  
-    # # 取得有買進的訊號，只要任一股票有買進訊號，signal就會是True
-    stock["signal"] = position.any(axis=1)
+  if '+' not in resample and '-' not in resample:
+      return
 
-    # 買:手續費、賣:手續費 + 交易稅
-    buy_extra_cost = fee_ratio
-    sell_extra_cost = fee_ratio + tax_ratio
+  if '-' in resample and not resample.split('-')[-1].isdigit():
+      return
 
-    # 初始化資產
-    assets = pd.DataFrame(index=position.index, columns=["portfolio_value", "cost", "init", "remain"])
-    assets["init"] = init_portfolio_value
-    shares_df = pd.DataFrame(0, index=position.index, columns=position.columns)
-    prev_values = {}
+  if '+' in resample:
+      r, o = resample.split('+')
+  elif '-' in resample:
+      r, o = resample.split('-')
 
-    first_trading = True
-    for day in position.index:
-        # 持有股票
-        if stock.loc[day]['signal'] == False:
-            if day == stock.index[0]:
-                # 第一天直接取shares_df裡的值 (全部都0)
-                prev_values = shares_df.loc[day].to_dict()
+  warnings.warn(f"The argument sim(..., resample = '{resample}') will no longer support after 0.1.37.dev1.\n"
+                f"please use sim(..., resample='{r}', offset='{o}d')", DeprecationWarning)
 
-                assets.loc[day, "portfolio_value"] = 0
-                assets.loc[day, "cost"] = 0
-                assets.loc[day, "remain"] =  0
+def calc_essential_price(price, dates):
 
-            else:   # 剩下的取前一天的
-                shares_df.loc[day] = shares_df.shift(1).loc[day]
-                # 只有portfolio value重新計算
-                assets.loc[day, "portfolio_value"] = ((stock.loc[day].drop(["signal"]) * shares_df.loc[day]).sum())
-                assets.loc[day, ["cost", "init", "remain"]] = assets.shift(1).loc[day, ["cost", "init", "remain"]]
-                position.loc[day] = position.shift(1).loc[day]
+    dt = min(price.index.values[1:] - price.index.values[:-1])
+
+    indexer = price.index.get_indexer(dates + dt)
+
+    valid_idx = np.where(indexer == -1, np.searchsorted(price.index, dates, side='right'), indexer)
+    valid_idx = np.where(valid_idx >= len(price), len(price) - 1, valid_idx)
+
+    return price.iloc[valid_idx]
+
+def arguments(price, high, low, open_, position, resample_dates=None, fast_mode=False):
+
+    resample_dates = price.index if resample_dates is None else resample_dates
+    position = position.astype(float).fillna(0)
+
+    if fast_mode:
+        date_index = pd.to_datetime(resample_dates)
+        position = position.reindex(date_index, method='ffill')
+        price = calc_essential_price(price, date_index)
+        high = calc_essential_price(high, date_index)
+        low = calc_essential_price(low, date_index)
+        open_ = calc_essential_price(open_, date_index)
+    
+    resample_dates = pd.Series(resample_dates).view(np.int64).values
+
+    return [price.values,
+            high.values,
+            low.values,
+            open_.values,
+            price.index.view(np.int64),
+            price.columns.astype(str).values,
+            position.values,
+            position.index.view(np.int64),
+            position.columns.astype(str).values,
+            resample_dates
+            ]
+
+def rebase(prices, value=100):
+    """
+    Rebase all series to a given intial value.
+    This makes comparing/plotting different series
+    together easier.
+    Args:
+        * prices: Expects a price series
+        * value (number): starting value for all series.
+    """
+    if isinstance(prices, pd.DataFrame):
+        return prices.div(prices.iloc[0], axis=1) * value
+    return prices / prices.iloc[0] * value
+
+def sim(position: Union[pd.DataFrame, pd.Series],
+        resample:Union[str, None]=None, resample_offset:Union[str, None] = None,
+        position_limit:float=1, fee_ratio:float=1.425/1000,
+        tax_ratio: float=3/1000, stop_loss: Union[float, None]=None,
+        take_profit: Union[float, None]=None, trail_stop: Union[float, None]=None, touched_exit: bool=False,
+        retain_cost_when_rebalance: bool=False, stop_trading_next_period: bool=True, live_performance_start:Union[str, None]=None,
+        mae_mfe_window:int=0, mae_mfe_window_step:int=1, fast_mode=False, data=None):
 
 
-        # 再平衡（rebalance）
-        else : 
-            if first_trading:
-                first_trading = False
-                buy_amount = init_portfolio_value * position.loc[day] / (stock.loc[day].drop(['signal']) * (1 + buy_extra_cost))
-                shares_df.loc[day] = np.floor(buy_amount.fillna(0.0))
+     # check type of position
+    if not isinstance(position.index, pd.DatetimeIndex):
+        raise TypeError("Expected the dataframe to have a DatetimeIndex")
+    
+    if isinstance(data, Data):
+        price = data.get('price:close')
+    else:
+        data=Data()
+        price = data.get('price:close')
 
-                portfolio_value = (stock.loc[day].drop(['signal']) * shares_df.loc[day]).sum()
-                total_cost = (stock.loc[day].drop(['signal']) * shares_df.loc[day] * buy_extra_cost).sum()
-                remain = init_portfolio_value - portfolio_value - total_cost
-                sell_money = init_portfolio_value
+    high = price
+    low = price
+    open_ = price
+    if touched_exit:
+        high = data.get('price:high').reindex_like(price)
+        low =data.get('price:low').reindex_like(price)
+        open_ = data.get('price:open').reindex_like(price) 
 
-                prev_values = shares_df.loc[day].to_dict()
-            else:
-                # 把前一次持有的股票全部賣掉，換新的股票進場
-                # 可以拿來投資的金額 = 股價 * 前一次持有之張數 * 賣出手續費 + 前一次剩餘的金額 
-                sell_money = ((stock.loc[day].drop(['signal']) * pd.Series(prev_values)).sum() * (1 - sell_extra_cost)) + assets.shift(1).loc[day, "remain"]
+    if not isinstance(price.index[0], pd.DatetimeIndex):
+        price.index = pd.to_datetime(price.index)
+        high.index = pd.to_datetime(high.index)
+        low.index = pd.to_datetime(low.index)
+        open_.index = pd.to_datetime(open_.index)
 
-                # 計算每一支股票買多少張
-                shares_df.loc[day] = np.floor(sell_money * position.loc[day] / (stock.drop(['signal'], axis=1).loc[day] * (1 + buy_extra_cost)))
+    assert len(position.shape) >= 2
+    delta_time_rebalance = position.index[-1] - position.index[-3]
+    backtest_to_end = position.index[-1] + \
+        delta_time_rebalance > price.index[-1]
 
-                sell_cost = (stock.loc[day].drop(['signal']) * pd.Series(prev_values)).sum() * sell_extra_cost
-                buy_cost = (shares_df.loc[day] * stock.loc[day].drop(['signal']) * buy_extra_cost).sum()
-                total_cost = sell_cost + buy_cost
+    tz = position.index.tz
+    now = datetime.datetime.now(tz=tz)
 
-                # 用投入金額 - 購入股票金額，可以得到因無條件捨去後剩餘的金額
-                remain = sell_money - (shares_df.loc[day] * stock.drop(['signal'], axis=1).loc[day] * (1+buy_extra_cost)).sum()
+    position = position[(position.index <= price.index[-1]) | (position.index <= now)]
+    backtest_end_date = price.index[-1] if backtest_to_end else position.index[-1]
 
-                portfolio_value = (stock.loc[day].drop(['signal']) * shares_df.loc[day]).sum()
-                prev_values = shares_df.loc[day].to_dict()
+    # resample dates
+    dates = None
+    next_trading_date = position.index[-1]
+    if isinstance(resample, str):
 
-            assets.loc[day, "portfolio_value"] = portfolio_value
-            assets.loc[day, ["cost", "init", "remain"]] = [total_cost, sell_money, remain]
+        warning_resample(resample)
+
+        # add additional day offset
+        offset_days = 0
+        if '+' in resample:
+            offset_days = int(resample.split('+')[-1])
+            resample = resample.split('+')[0]
+        if '-' in resample and resample.split('-')[-1].isdigit():
+            offset_days = -int(resample.split('-')[-1])
+            resample = resample.split('-')[0]
+
+        # generate rebalance dates
+        alldates = pd.date_range(
+            position.index[0], 
+            position.index[-1] + datetime.timedelta(days=720), 
+            freq=resample, tz=tz)
+
+        alldates += DateOffset(days=offset_days)
+
+        if resample_offset is not None:
+            alldates += to_offset(resample_offset)
+
+        dates = [d for d in alldates if position.index[0]
+                 <= d and d <= position.index[-1]]
+
+        # calculate the latest trading date
+        next_trading_date = min(
+           set(alldates) - set(dates))
+
+        if dates[-1] != position.index[-1]:
+            dates += [next_trading_date]
+
+    if stop_loss is None or stop_loss == 0:
+        stop_loss = 1
+
+    if take_profit is None or take_profit == 0:
+        take_profit = np.inf
+
+    if trail_stop is None or trail_stop == 0:
+        trail_stop = np.inf
+
+    if dates is not None:
+        position = position.reindex(dates, method='ffill')
+
+    args = arguments(price, high, low, open_, position, dates, fast_mode=fast_mode)
+
+    creturn_value = backtest_(*args,
+                              fee_ratio=fee_ratio, tax_ratio=tax_ratio,
+                              stop_loss=stop_loss, take_profit=take_profit, trail_stop=trail_stop,
+                              touched_exit=touched_exit, position_limit=position_limit,
+                              retain_cost_when_rebalance=retain_cost_when_rebalance,
+                              stop_trading_next_period=stop_trading_next_period,
+                              mae_mfe_window=mae_mfe_window, mae_mfe_window_step=mae_mfe_window_step)
+    
+    total_weight = position.abs().sum(axis=1)
+
+    position = position.div(total_weight.where(total_weight!=0, np.nan), axis=0).fillna(0)\
+                       .clip(-abs(position_limit), abs(position_limit))
+    
+    creturn_dates = dates if dates and fast_mode else price.index
+
+    creturn = (pd.Series(creturn_value, creturn_dates)
+                # remove the begining of creturn since there is no pct change
+                .pipe(lambda df: df[(df != 1).cumsum().shift(-1, fill_value=1) != 0])
+                # remove the tail of creturn for verification
+                .loc[:backtest_end_date]
+                # replace creturn to 1 if creturn is None
+                .pipe(lambda df: df if len(df) != 0 else pd.Series(1, position.index)))
+    
+    position = position.loc[creturn.index[0]:]
+
+    daily_creturn = rebase(creturn.resample('1d').last().dropna().ffill())
+    
+    stock_data = pd.DataFrame(index = creturn.index)
+    stock_data['portfolio_returns'] = daily_creturn
+    stock_data['cum_returns'] = creturn
+    stock_data['company_count'] = (position != 0).sum(axis=1)
+
+    r = report.Report(stock_data, position)
+    return r
+    """
+    r = report.Report(
+        creturn=creturn,
+        position=position,
+        fee_ratio=fee_ratio,
+        tax_ratio=tax_ratio,
+        trade_at=trade_at_price,
+        next_trading_date=next_trading_date,
+        market_info=market)
+
 
     stock_data = pd.DataFrame(index=stock_price.index)
     shares_df = shares_df.reindex(stock_price.index, method="ffill")
+    # stock_data['portfolio_value'] = assets['portfolio_value'].asfreq('D', method='ffill')
     stock_data['portfolio_value'] = (stock_price * shares_df).sum(axis=1)
+    start_trading_day = stock_data.loc[stock_data['portfolio_value'] != 0.0].index[0]
+    stock_data = stock_data.loc[start_trading_day:]
 
     # daily return
     stock_data['portfolio_returns'] = stock_data['portfolio_value'].pct_change(1)
-    stock_data = stock_data.fillna(0).replace([np.inf, -np.inf], 0)
+    stock_data = stock_data.fillna(0).replace([np.inf, -np.inf, -1], 0)
 
     # 累計報酬
-    stock_data['cum_returns'] = stock_data['portfolio_returns'].add(1).cumprod()
-    
-    r = report.Report(stock_data, position)
+    stock_data['cum_returns'] = stock_data['portfolio_returns'].add(1).cumprod().sub(1)
 
+    # 每日入選股票數量
+    stock_data['company_count'] = (position != 0).sum(axis=1)
+    stock_data['company_count'] = stock_data['company_count'].fillna(0)
+    
+    r = report.Report(stock_data, position, assets)
     return r
+    """
+    return position,dates,creturn,next_trading_date

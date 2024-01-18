@@ -37,6 +37,7 @@ class Data:
         self.all_price_dict = self.handle_price_data()
         # 下載財報資料
         self.raw_report_data = self.db.get_finance_report()
+        self.raw_taiex_data = self.db.get_taiex_data()
 
     def format_price_data(self, item):
         """
@@ -104,6 +105,7 @@ class Data:
         """
         # 使用 lower() 方法將字串轉換為小寫
         dataset = dataset.lower()
+        dataset = dataset.replace(" ", "")
         # 使用 split() 函數按 ":" 分隔字串
         parts = dataset.split(":")
         if len(parts) == 2:
@@ -129,8 +131,14 @@ class Data:
             # return report_data
             return adjusted_report_data
 
+        # EX. 想要取得台股加權指數(收盤價):
+        # taiex_close = data.get("taiex: close")
+        elif subject == "taiex":
+            self.raw_taiex_data.set_index("date", inplace=True)
+            return self.raw_taiex_data[[item]]
+
         else:
-            print("目前資料來源有price、report")
+            print("目前資料來源有price、report、taiex")
 
     def indicator(self, indname, adjust_price=False, resample="D", **kwargs):
         """支援 Talib 和 pandas_ta 上百種技術指標，計算 2000 檔股票、10年的所有資訊。
