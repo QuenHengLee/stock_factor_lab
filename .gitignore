@@ -218,7 +218,7 @@ Backup of *.doc*
 # output plot files
 *.html
 /OutputFile
-*.ipynb
+
 # template from finlab doc files
 /OfficialPage
 
