@@ -258,7 +258,8 @@ class Report():
 
         start = daily_prices.index[0]
         end = daily_prices.index[-1]
-        return (daily_prices.iloc[-1] / daily_prices.iloc[0]) ** (1 / year_frac(start, end)) - 1
+        # return (daily_prices.iloc[-1] / daily_prices.iloc[0]) ** (1 / year_frac(start, end)) - 1
+        return (safe_division(daily_prices.iloc[-1], daily_prices.iloc[0])) ** safe_division(1, year_frac(start, end)) - 1
 
     def calc_return_table(self):
         self.return_table = {}
