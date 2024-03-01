@@ -24,11 +24,13 @@ class Report():
         # 計算
         fig = self.create_performance_figure(self.position)
 
+        stats = self.get_stats()
+
         imp_stats = pd.Series({
          'annualized_rate_of_return':str(round(self.calc_cagr()*100, 2))+'%',
          'sharpe': str(self.calc_sharpe(self.stock_data['portfolio_returns'], nperiods=252)),
          'max_drawdown':str(round(self.calc_dd(self.stock_data['portfolio_returns']).min()*100, 2))+'%',
-         'win_ratio':str(round(self.calc_win_ratio()*100, 2))+'%',
+         'win_ratio':str(round(stats['win_ratio']*100, 2))+'%',
         }).to_frame().T
         imp_stats.index = ['']
 
@@ -194,13 +196,6 @@ class Report():
                           )
         return fig
 
-    def calc_win_ratio(self):
-        '''
-        計算勝率是看每天報酬>0的天數/總天數
-        '''
-        trades = self.stock_data.replace([0],np.nan).dropna()
-        return sum(trades['portfolio_returns'] > 0) / len(trades) if len(trades) != 0 else 0
-
     def calc_dd(self, daily_return):
         '''
         計算Drawdown的方式是找出截至當下的最大累計報酬(%)除以當下的累計報酬
@@ -263,7 +258,8 @@ class Report():
 
         start = daily_prices.index[0]
         end = daily_prices.index[-1]
-        return (daily_prices.iloc[-1] / daily_prices.iloc[0]) ** (1 / year_frac(start, end)) - 1
+        # return (daily_prices.iloc[-1] / daily_prices.iloc[0]) ** (1 / year_frac(start, end)) - 1
+        return (safe_division(daily_prices.iloc[-1], daily_prices.iloc[0])) ** safe_division(1, year_frac(start, end)) - 1
 
     def calc_return_table(self):
         self.return_table = {}
@@ -360,13 +356,15 @@ class Report():
         mp = monthly_prices
         yp = yearly_prices
 
+        trades = self.trades.dropna()
+
         stats = {}
         # stats["daily_mean"] = dr.mean() * 252
         stats["CAGR"] = self.calc_cagr()
         stats['daily_sharpe'] = self.calc_sharpe(dp, nperiods=252)
         stats['max_drawdown'] = self.calc_dd(self.stock_data['portfolio_returns']).min()
         stats['avg_drawdown'] = self.calc_dd(self.stock_data['portfolio_returns']).mean()
-        stats['win_ratio'] = self.calc_win_ratio()
+        stats['win_ratio'] = sum(trades['return'] > 0) / len(trades) if len(trades) != 0 else 0
         stats['ytd'] = self.calc_ytd(dp,yp)
 
         return stats
